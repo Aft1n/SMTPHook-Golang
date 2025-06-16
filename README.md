@@ -1,6 +1,6 @@
 # SMTPHook
 
-SMTPHook is a modular and containerized platform to receive, parse, and forward emails to webhooks. It is written entirely in Go, uses Podman (or Docker), and is ready with systemd and logrotate support.
+SMTPHook is a modular and containerized platform to receive, parse, and forward emails to webhooks. It is written entirely in Go, uses Podman (or Docker) and is ready with systemd and logrotate support.
 
 ---
 
