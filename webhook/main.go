@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+
+	"github.com/joho/godotenv"
 )
 
 type EmailPayload struct {
@@ -24,9 +27,16 @@ func ingestHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	_ = godotenv.Load()
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "4000"
+	}
+
 	http.HandleFunc("/ingest", ingestHandler)
-	log.Println("Webhook listening on :4000")
-	if err := http.ListenAndServe(":4000", nil); err != nil {
+	log.Printf("Webhook listening on :%s\n", port)
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Fatal("Server error:", err)
 	}
 }
