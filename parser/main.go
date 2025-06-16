@@ -1,97 +1,73 @@
-// parser/main.go
 package main
 
 import (
+	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 	"time"
 )
 
-type Email struct {
-	ID       string `json:"ID"`
-	From     string `json:"From"`
-	To       string `json:"To"`
-	Subject  string `json:"Subject"`
-	Body     string `json:"Text"`
-	Received string `json:"Created"`
+type MailpitMessage struct {
+	ID      string `json:"ID"`
+	Subject string `json:"Subject"`
+	From    []struct {
+		Address string `json:"Address"`
+	} `json:"From"`
+	Text string `json:"Text"`
 }
 
-func fetchEmails(apiURL string) ([]Email, error) {
-	resp, err := http.Get(apiURL)
+type MailpitResponse struct {
+	Messages []MailpitMessage `json:"messages"`
+}
+
+func fetchEmails() []MailpitMessage {
+	resp, err := http.Get("http://mailpit:8025/api/v1/messages")
 	if err != nil {
-		return nil, err
+		log.Println("Error fetching emails:", err)
+		return nil
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to fetch emails: %s", resp.Status)
-	}
+	body, _ := ioutil.ReadAll(resp.Body)
 
-	var emails []Email
-	if err := json.NewDecoder(resp.Body).Decode(&emails); err != nil {
-		return nil, err
+	var result MailpitResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		log.Println("Error parsing JSON:", err)
+		return nil
 	}
-	return emails, nil
+	return result.Messages
 }
 
-func forwardEmail(email Email, webhookURL string) error {
-	body, err := json.Marshal(email)
-	if err != nil {
-		return err
+func forwardEmail(msg MailpitMessage) {
+	payload := map[string]interface{}{
+		"from":    msg.From[0].Address,
+		"subject": msg.Subject,
+		"body":    msg.Text,
 	}
+	data, _ := json.Marshal(payload)
 
-	resp, err := http.Post(webhookURL, "application/json", bytes.NewBuffer(body))
+	resp, err := http.Post("http://webhook:4000/ingest", "application/json", bytes.NewBuffer(data))
 	if err != nil {
-		return err
+		log.Println("Failed to forward email:", err)
+		return
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode >= 300 {
-		b, _ := ioutil.ReadAll(resp.Body)
-		return fmt.Errorf("webhook error %d: %s", resp.StatusCode, string(b))
-	}
-
-	return nil
+	log.Printf("Forwarded: %s (%s)\n", msg.Subject, msg.From[0].Address)
 }
 
 func main() {
-	mailpitAPI := os.Getenv("MAILPIT_API")           // e.g., http://mailpit:8025/api/v1/messages
-	webhookURL := os.Getenv("WEBHOOK_URL")           // e.g., http://webhook-server:4000/webhook
-	pollInterval := 10 * time.Second
-
-	if mailpitAPI == "" || webhookURL == "" {
-		log.Fatal("MAILPIT_API and WEBHOOK_URL must be set")
-	}
-
-	log.Println("Starting email parser...")
-
-	seen := make(map[string]bool)
-
+	seen := map[string]bool{}
 	for {
-		emails, err := fetchEmails(mailpitAPI)
-		if err != nil {
-			log.Printf("Error fetching emails: %v", err)
-			time.Sleep(pollInterval)
-			continue
-		}
-
-		for _, email := range emails {
-			if seen[email.ID] {
+		messages := fetchEmails()
+		for _, msg := range messages {
+			if seen[msg.ID] {
 				continue
 			}
-
-			if err := forwardEmail(email, webhookURL); err != nil {
-				log.Printf("Failed to forward email %s: %v", email.ID, err)
-			} else {
-				log.Printf("Forwarded email %s to webhook", email.ID)
-				seen[email.ID] = true
-			}
+			forwardEmail(msg)
+			seen[msg.ID] = true
 		}
-
-		time.Sleep(pollInterval)
+		time.Sleep(5 * time.Second)
 	}
 }
