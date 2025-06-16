@@ -8,6 +8,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 type ParsedEmail struct {
@@ -53,8 +55,8 @@ func parseEmail(input string) ParsedEmail {
 	return email
 }
 
-func writeLog(entry LogEntry) {
-	file, err := os.OpenFile("logs/parser.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+func writeLog(entry LogEntry, logPath string) {
+	file, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Fatalf("error opening log file: %v", err)
 	}
@@ -69,12 +71,30 @@ func writeLog(entry LogEntry) {
 }
 
 func main() {
-	input := `Subject: Hello
-From: test@example.com
-To: recipient@example.com
-Date: Mon, 16 Jun 2025 14:00:00 +0200
+	_ = godotenv.Load()
 
-This is a test email body.`
+	logPath := os.Getenv("LOG_FILE_PATH")
+	if logPath == "" {
+		log.Fatal("LOG_FILE_PATH not set in .env")
+	}
+
+	inputFile := os.Getenv("EMAIL_INPUT_FILE")
+	var input string
+
+	if inputFile != "" {
+		content, err := os.ReadFile(inputFile)
+		if err != nil {
+			log.Fatalf("failed to read input file: %v", err)
+		}
+		input = string(content)
+	} else {
+		fmt.Println("Reading email from stdin (end with Ctrl+D):")
+		stdinBytes, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			log.Fatalf("failed to read from stdin: %v", err)
+		}
+		input = string(stdinBytes)
+	}
 
 	email := parseEmail(input)
 	entry := LogEntry{
@@ -83,6 +103,6 @@ This is a test email body.`
 		Event:     "parsed_email",
 		Data:      email,
 	}
-	writeLog(entry)
+	writeLog(entry, logPath)
 	fmt.Println("Email parsed and logged.")
 }
