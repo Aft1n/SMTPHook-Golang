@@ -1,0 +1,33 @@
+version: "3.9"
+
+services:
+  smtp:
+    image: axllent/mailpit:latest
+    container_name: smtp
+    ports:
+      - "8025:8025"    # Mailpit web UI
+      - "1025:1025"    # SMTP port
+    networks:
+      - smtphook
+
+  webhook:
+    build:
+      context: ./webhook
+    container_name: webhook
+    ports:
+      - "4000:4000"
+    networks:
+      - smtphook
+
+  parser:
+    build:
+      context: ./parser
+    container_name: parser
+    depends_on:
+      - smtp
+      - webhook
+    networks:
+      - smtphook
+
+networks:
+  smtphook:
