@@ -1,73 +1,88 @@
 package main
 
 import (
-	"bytes"
+	"bufio"
 	"encoding/json"
-	"io/ioutil"
+	"fmt"
 	"log"
-	"net/http"
+	"os"
+	"strings"
 	"time"
 )
 
-type MailpitMessage struct {
-	ID      string `json:"ID"`
-	Subject string `json:"Subject"`
-	From    []struct {
-		Address string `json:"Address"`
-	} `json:"From"`
-	Text string `json:"Text"`
+type ParsedEmail struct {
+	Subject string `json:"subject"`
+	From    string `json:"from"`
+	To      string `json:"to"`
+	Date    string `json:"date"`
+	Body    string `json:"body"`
 }
 
-type MailpitResponse struct {
-	Messages []MailpitMessage `json:"messages"`
+type LogEntry struct {
+	Timestamp string      `json:"timestamp"`
+	Service   string      `json:"service"`
+	Event     string      `json:"event"`
+	Data      ParsedEmail `json:"data"`
 }
 
-func fetchEmails() []MailpitMessage {
-	resp, err := http.Get("http://mailpit:8025/api/v1/messages")
+func parseEmail(input string) ParsedEmail {
+	scanner := bufio.NewScanner(strings.NewReader(input))
+	email := ParsedEmail{}
+	bodyLines := []string{}
+	isBody := false
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			isBody = true
+			continue
+		}
+		if isBody {
+			bodyLines = append(bodyLines, line)
+		} else if strings.HasPrefix(line, "Subject:") {
+			email.Subject = strings.TrimPrefix(line, "Subject: ")
+		} else if strings.HasPrefix(line, "From:") {
+			email.From = strings.TrimPrefix(line, "From: ")
+		} else if strings.HasPrefix(line, "To:") {
+			email.To = strings.TrimPrefix(line, "To: ")
+		} else if strings.HasPrefix(line, "Date:") {
+			email.Date = strings.TrimPrefix(line, "Date: ")
+		}
+	}
+	email.Body = strings.Join(bodyLines, "\n")
+	return email
+}
+
+func writeLog(entry LogEntry) {
+	file, err := os.OpenFile("logs/parser.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		log.Println("Error fetching emails:", err)
-		return nil
+		log.Fatalf("error opening log file: %v", err)
 	}
-	defer resp.Body.Close()
+	defer file.Close()
 
-	body, _ := ioutil.ReadAll(resp.Body)
-
-	var result MailpitResponse
-	if err := json.Unmarshal(body, &result); err != nil {
-		log.Println("Error parsing JSON:", err)
-		return nil
-	}
-	return result.Messages
-}
-
-func forwardEmail(msg MailpitMessage) {
-	payload := map[string]interface{}{
-		"from":    msg.From[0].Address,
-		"subject": msg.Subject,
-		"body":    msg.Text,
-	}
-	data, _ := json.Marshal(payload)
-
-	resp, err := http.Post("http://webhook:4000/ingest", "application/json", bytes.NewBuffer(data))
+	jsonData, err := json.Marshal(entry)
 	if err != nil {
-		log.Println("Failed to forward email:", err)
+		log.Printf("error marshaling log entry: %v", err)
 		return
 	}
-	defer resp.Body.Close()
-	log.Printf("Forwarded: %s (%s)\n", msg.Subject, msg.From[0].Address)
+	file.WriteString(string(jsonData) + "\n")
 }
 
 func main() {
-	seen := map[string]bool{}
-	for {
-		messages := fetchEmails()
-		for _, msg := range messages {
-			if seen[msg.ID] {
-				continue
-			}
-			forwardEmail(msg)
-			seen[msg.ID] = true
-		}
-		time.Sleep(5 * time.Second)
+	input := `Subject: Hello
+From: test@example.com
+To: recipient@example.com
+Date: Mon, 16 Jun 2025 14:00:00 +0200
+
+This is a test email body.`
+
+	email := parseEmail(input)
+	entry := LogEntry{
+		Timestamp: time.Now().Format("2006-01-02 15:04:05 MST"),
+		Service:   "parser",
+		Event:     "parsed_email",
+		Data:      email,
 	}
+	writeLog(entry)
+	fmt.Println("Email parsed and logged.")
 }
