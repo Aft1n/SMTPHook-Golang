@@ -4,94 +4,73 @@ set -e
 echo "🔎 Running SMTPHook diagnostic..."
 echo
 
-# Paths
-BIN_PATH="/opt/smtphook/bin"
-ENV_PATH="/opt/smtphook"
-LOG_DIR="logs"
-PORTS=()
-
-# Services to check
-SERVICES=("parser" "webhook" "webhook-server")
-
 echo "🧩 Checking binaries..."
-for service in "${SERVICES[@]}"; do
-  if [ -x "$BIN_PATH/$service" ]; then
-    echo "✔️  $BIN_PATH/$service exists"
+for bin in parser webhook webhook-server; do
+  if [ -f "/opt/smtphook/bin/$bin" ]; then
+    echo "✔️  /opt/smtphook/bin/$bin exists"
   else
-    echo "❌ $BIN_PATH/$service missing or not executable"
+    echo "❌ /opt/smtphook/bin/$bin missing"
   fi
 done
-echo
 
+echo
 echo "📁 Checking working directories and .env files..."
-for service in "${SERVICES[@]}"; do
-  if [ -d "$ENV_PATH/$service" ]; then
-    echo -n "✔️  $ENV_PATH/$service exists"
-    if [ -f "$ENV_PATH/$service/.env" ]; then
-      echo -e "\n   └── .env found"
-      port=$(grep -E '^PORT=' "$ENV_PATH/$service/.env" | cut -d '=' -f2)
-      if [[ -n "$port" ]]; then
-        PORTS+=("$port:$service")
-      fi
+for dir in parser webhook webhook-server; do
+  if [ -d "/opt/smtphook/$dir" ]; then
+    echo "✔️  /opt/smtphook/$dir exists"
+    if [ -f "/opt/smtphook/$dir/.env" ]; then
+      echo "   └── .env found"
     else
-      echo -e "\n   └── ❌ .env missing"
+      echo "   ❌ .env missing"
     fi
   else
-    echo "❌ $ENV_PATH/$service missing"
+    echo "❌ /opt/smtphook/$dir missing"
   fi
 done
-echo
 
+echo
 echo "🧠 Checking systemd service status..."
-for service in "${SERVICES[@]}"; do
+for service in parser webhook webhook-server; do
   echo
-  echo "🔸 $service.service:"
-  if systemctl list-units --type=service --all | grep -q "$service.service"; then
-    systemctl --no-pager --no-legend status "$service.service" || echo "   ❌ Service exists but failed to start"
+  echo "🔸 ${service}.service:"
+  if systemctl list-unit-files | grep -q "^${service}.service"; then
+    if systemctl is-active --quiet "$service"; then
+      systemctl status "$service" --no-pager -n 1 | sed 's/^/   /'
+    else
+      echo "   ❌ Service exists but failed to start"
+      systemctl status "$service" --no-pager -n 3 | sed 's/^/   /'
+    fi
   else
-    echo "❌ $service.service not found in systemd"
+    echo "   ❌ ${service}.service not found in systemd"
   fi
 done
-echo
 
+echo
 echo "📄 Checking log directory..."
-if [ -d "$LOG_DIR" ]; then
-  echo "✔️  $LOG_DIR exists"
+if [ -d logs ]; then
+  echo "✔️  logs exists"
 else
-  echo "❌ $LOG_DIR missing"
+  echo "❌ logs directory missing"
 fi
-echo
 
+echo
 echo "📡 Checking open ports..."
-# Try ss, fallback to netstat
-if command -v ss &>/dev/null; then
-  NET_CMD="ss -tuln"
-else
-  NET_CMD="netstat -tuln"
-fi
-eval "$NET_CMD" | grep -E ':1025|:4000|:4001|:8025' || echo "No expected ports found open"
+ss -tuln | grep -E ':1025|:8025|:4000|:4001' || echo "❌ No expected ports open"
 
 echo
-
-# Detect port conflicts
 echo "🧪 Checking for PORT conflicts in .env files..."
-declare -A PORT_MAP
-for item in "${PORTS[@]}"; do
-  port="${item%%:*}"
-  service="${item##*:}"
-  if [[ -n "${PORT_MAP[$port]}" ]]; then
-    echo "⚠️  Port conflict detected: $port used by both ${PORT_MAP[$port]} and $service"
-  else
-    PORT_MAP[$port]=$service
+for dir in parser webhook webhook-server; do
+  if [ -f "$dir/.env" ]; then
+    echo "→ $dir/.env: $(grep PORT= "$dir/.env" || echo 'PORT not defined')"
   fi
 done
 
 echo
 echo "🧾 Tailing logs (if present)..."
-for service in "${SERVICES[@]}"; do
+for service in parser webhook webhook-server; do
   logfile="logs/${service}.log"
   if [ -f "$logfile" ]; then
-    echo "→ Last 3 lines of $logfile:"
+    echo "→ Last log lines from $logfile:"
     tail -n 3 "$logfile"
   fi
 done
