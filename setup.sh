@@ -55,7 +55,7 @@ done
 
 echo "📁 Creating logs/ directory..."
 mkdir -p logs
-sudo chown "$(whoami)" logs 2>/dev/null || true
+sudo chown "$(whoami)":"$(whoami)" logs 2>/dev/null || true
 
 echo "🔧 Copying .env.example files..."
 for dir in parser webhook webhook-server; do
