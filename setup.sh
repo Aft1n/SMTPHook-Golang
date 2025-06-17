@@ -47,25 +47,16 @@ echo "🧰 Installing podman-compose with pipx..."
 pipx install --force podman-compose
 export PATH="$HOME/.local/bin:$PATH"
 
-echo "📬 Installing Mailpit..."
-MAILPIT_VERSION="v1.14.2"
-MAILPIT_URL="https://github.com/axllent/mailpit/releases/download/${MAILPIT_VERSION}/mailpit_${MAILPIT_VERSION}_linux_amd64.tar.gz"
-
-TMP_DIR="$(mktemp -d)"
-curl -L "$MAILPIT_URL" -o "$TMP_DIR/mailpit.tar.gz"
-
-tar -xzf "$TMP_DIR/mailpit.tar.gz" -C "$TMP_DIR"
-
-if [ -f "$TMP_DIR/mailpit" ]; then
-  sudo cp "$TMP_DIR/mailpit" /opt/smtphook/bin/
-  sudo chmod +x /opt/smtphook/bin/mailpit
-  echo "✔️  Mailpit installed to /opt/smtphook/bin/mailpit"
+echo "📬 Starting Mailpit via Podman Compose..."
+if [ -f podman-compose.yml ] || [ -f docker-compose.yml ]; then
+  COMPOSE_FILE="podman-compose.yml"
+  [ -f docker-compose.yml ] && COMPOSE_FILE="docker-compose.yml"
+  podman-compose -f "$COMPOSE_FILE" up -d smtp
+  echo "✔️  Mailpit container started using $COMPOSE_FILE"
 else
-  echo "❌ Failed to install Mailpit: binary not found in archive"
+  echo "❌ Could not find podman-compose.yml or docker-compose.yml"
   exit 1
 fi
-
-rm -rf "$TMP_DIR"
 
 echo "🧹 Running go mod tidy for all services..."
 for dir in parser webhook webhook-server; do
@@ -102,7 +93,9 @@ for dir in parser webhook webhook-server; do
 done
 
 echo "🛠 Installing systemd service units..."
-sudo cp etc/system/systemd/*.service /etc/systemd/system/
+for service_file in etc/system/systemd/*.service; do
+  sudo cp "$service_file" /etc/systemd/system/
+done
 sudo cp etc/system/systemd/smtphook.target /etc/systemd/system/
 sudo systemctl daemon-reexec
 sudo systemctl daemon-reload
