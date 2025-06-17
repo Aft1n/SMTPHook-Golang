@@ -3,20 +3,22 @@ set -e
 
 echo "🧨 Resetting SMTPHook environment..."
 
-CONTAINERS=("smtp" "webhook" "webhook-server" "parser")
+# IMPORTANT: Order matters (remove dependents first)
+CONTAINERS=("parser" "webhook-server" "webhook" "smtp")
 
 echo "🧹 Stopping and removing containers..."
 for cname in "${CONTAINERS[@]}"; do
   if podman container exists "$cname"; then
     echo "🛑 Removing $cname..."
-    podman rm -f "$cname"
+    podman rm -f "$cname" || true
   fi
 done
 
 echo "🧼 Removing old images..."
 for img in "${CONTAINERS[@]}"; do
   if podman image exists "localhost/smtphook-golang_$img"; then
-    podman rmi -f "localhost/smtphook-golang_$img"
+    echo "🧽 Removing image smtphook-golang_$img..."
+    podman rmi -f "localhost/smtphook-golang_$img" || true
   fi
 done
 
