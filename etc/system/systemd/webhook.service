@@ -1,17 +1,15 @@
 [Unit]
 Description=SMTPHook Webhook
 After=network.target
-Wants=smtphook.target
-PartOf=smtphook.target
 
 [Service]
-Type=simple
-WorkingDirectory=/opt/smtphook/webhook
 ExecStart=/opt/smtphook/bin/webhook
+WorkingDirectory=/opt/smtphook/webhook
+EnvironmentFile=/opt/smtphook/webhook/.env
 Restart=always
-RestartSec=3
-StandardOutput=append:/var/log/smtphook/webhook.log
-StandardError=append:/var/log/smtphook/webhook.err.log
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=smtphook.target
