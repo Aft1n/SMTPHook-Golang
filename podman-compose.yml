@@ -2,11 +2,11 @@ version: "3.9"
 
 services:
   smtp:
-    image: axllent/mailpit:latest
+    image: docker.io/axllent/mailpit:latest
     container_name: smtp
     ports:
-      - "8025:8025"    # Mailpit web UI
-      - "1025:1025"    # SMTP port
+      - "8025:8025"    # Mailpit Web UI
+      - "1025:1025"    # SMTP Port
     networks:
       - smtphook
 
