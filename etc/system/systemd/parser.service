@@ -1,16 +1,15 @@
 [Unit]
 Description=SMTPHook Parser
 After=network.target
-Requires=smtphook.target
 
 [Service]
 Type=simple
-User=smtphook
+ExecStart=/opt/smtphook/bin/parser
 WorkingDirectory=/opt/smtphook/parser
 EnvironmentFile=/opt/smtphook/parser/.env
-ExecStart=/opt/smtphook/bin/parser
 Restart=always
-RestartSec=5s
+User=nobody
+Group=nogroup
 
 [Install]
 WantedBy=smtphook.target
