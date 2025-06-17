@@ -1,5 +1,12 @@
 # SMTPHook
 
+## ☕ Support
+
+If you find this project useful, consider buying me a coffee:
+
+[![Donate](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Donate-yellow)](https://coff.ee/voidwatch)
+
+
 **SMTPHook** is a modular email processing platform written in Go. It receives SMTP email, parses the content into structured JSON, and sends it to your specified HTTP API endpoint — such as a PagerDuty or Opsgenie pager API.
 
 ---
