@@ -1,11 +1,22 @@
-FROM golang:1.22-alpine
+FROM golang:1.21-alpine
 
 WORKDIR /app
 
+# Optimize build cache
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source
 COPY . .
 
-RUN go build -o parser
+# Build binary
+RUN go build -o main
 
-VOLUME [ "/app/logs" ]
+# Optional default env (can be overridden by `.env`)
+ENV PORT=4000
+ENV LOG_FILE_PATH=logs/output.log
 
-CMD ["./parser"]
+# Create logs dir
+RUN mkdir -p /app/logs
+
+CMD ["./main"]
