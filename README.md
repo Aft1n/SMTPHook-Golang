@@ -58,8 +58,8 @@ This will:
 ```bash
 git clone git@github.com:voidwatch/SMTPHook-Golang.git
 cd SMTPHook-Golang
-chmod +x run.sh
-./run.sh
+chmod +x setup.sh
+./setup.sh
 ```
 
 > This ensures:
