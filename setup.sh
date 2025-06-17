@@ -26,7 +26,6 @@ else
 fi
 
 echo "📦 Installing dependencies with $PM..."
-
 case $PM in
   apt)
     sudo apt update
@@ -44,7 +43,7 @@ case $PM in
 esac
 
 echo "🧰 Installing podman-compose with pipx..."
-pipx install --force podman-compose
+pipx install --force podman-compose || true
 export PATH="$HOME/.local/bin:$PATH"
 
 echo "🧹 Running go mod tidy for all services..."
@@ -52,6 +51,10 @@ for dir in parser webhook webhook-server; do
   echo "→ Tidying $dir"
   (cd "$dir" && go mod tidy)
 done
+
+echo "📁 Creating logs/ directory..."
+mkdir -p logs
+sudo chown "$(whoami)" logs 2>/dev/null || true
 
 echo "🔧 Copying .env.example files..."
 for dir in parser webhook webhook-server; do
@@ -64,26 +67,45 @@ done
 echo "🔨 Building services with Make..."
 make
 
-echo "📦 Building containers with podman..."
-podman build -t smtphook-parser ./parser
-podman build -t smtphook-webhook ./webhook
-podman build -t smtphook-webhook-server ./webhook-server
-podman pull docker.io/axllent/mailpit:latest
+echo "📬 Building and launching containers with Podman Compose..."
+if [ -f podman-compose.yml ] || [ -f docker-compose.yml ]; then
+  COMPOSE_FILE="podman-compose.yml"
+  [ -f docker-compose.yml ] && COMPOSE_FILE="docker-compose.yml"
+  podman-compose -f "$COMPOSE_FILE" up -d
+  echo "✔️  Containers started using $COMPOSE_FILE"
+else
+  echo "❌ Could not find podman-compose.yml or docker-compose.yml"
+  exit 1
+fi
 
-echo "📁 Creating logs/ directory..."
-mkdir -p logs
+echo "📦 Installing binaries to /opt/smtphook/bin..."
+sudo mkdir -p /opt/smtphook/bin
+sudo cp bin/* /opt/smtphook/bin
 
-echo "🔌 Installing Quadlet container units..."
-mkdir -p ~/.config/containers/systemd/
-cp etc/quadlet/*.container ~/.config/containers/systemd/
+echo "📁 Preparing /opt/smtphook service directories..."
+for dir in parser webhook webhook-server; do
+  sudo mkdir -p "/opt/smtphook/$dir"
+  if [ -f "$dir/.env" ]; then
+    sudo cp "$dir/.env" "/opt/smtphook/$dir/.env"
+    echo "✔️  /opt/smtphook/$dir/.env deployed"
+  fi
+done
+
+echo "📁 Installing Quadlet container units..."
+QUADLET_DIR="$HOME/.config/containers/systemd"
+mkdir -p "$QUADLET_DIR"
+cp etc/quadlet/*.container "$QUADLET_DIR"
 
 echo "🔁 Enabling user-level Quadlet containers..."
-systemctl --user daemon-reexec
-systemctl --user daemon-reload
-
-for service in container-smtp container-webhook container-webhook-server container-parser; do
-  systemctl --user enable --now "$service.container"
-done
+if [ -n "$SUDO_USER" ]; then
+  runuser -u "$SUDO_USER" -- systemctl --user daemon-reexec || true
+  runuser -u "$SUDO_USER" -- systemctl --user daemon-reload
+  runuser -u "$SUDO_USER" -- systemctl --user enable --now container-*.container
+else
+  systemctl --user daemon-reexec || true
+  systemctl --user daemon-reload
+  systemctl --user enable --now container-*.container
+fi
 
 echo "🌀 Installing logrotate config..."
 sudo cp etc/logrotate.d/smtphook /etc/logrotate.d/
@@ -101,4 +123,6 @@ This is a test mailing
 EOF
 echo "✔️  email.txt created"
 
-echo "✅ Setup complete. All containers are running under Quadlet!"
+echo "✅ Setup complete. SMTPHook is running!"
+echo "📤 You can now test mail input with:"
+echo "    swaks --to test@example.com --server localhost:1025 < email.txt"
