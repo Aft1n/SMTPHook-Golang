@@ -55,7 +55,7 @@ done
 
 echo "📁 Creating logs/ directory..."
 mkdir -p logs
-sudo chown smtphook:smtphook logs || true
+sudo chown "$(whoami)" logs 2>/dev/null || true
 
 echo "🔧 Copying .env.example files..."
 for dir in parser webhook webhook-server; do
@@ -72,12 +72,6 @@ echo "📦 Installing binaries to /opt/smtphook/bin..."
 sudo mkdir -p /opt/smtphook/bin
 sudo cp bin/* /opt/smtphook/bin
 
-echo "👤 Creating system user 'smtphook' if not exists..."
-if ! id -u smtphook &>/dev/null; then
-  sudo useradd --system --no-create-home --shell /usr/sbin/nologin smtphook
-  echo "✔️  User 'smtphook' created"
-fi
-
 echo "📁 Preparing /opt/smtphook service directories..."
 for dir in parser webhook webhook-server; do
   sudo mkdir -p "/opt/smtphook/$dir"
@@ -85,14 +79,25 @@ for dir in parser webhook webhook-server; do
     sudo cp "$dir/.env" "/opt/smtphook/$dir/.env"
     echo "✔️  /opt/smtphook/$dir/.env deployed"
   fi
-  sudo chown -R smtphook:smtphook "/opt/smtphook/$dir"
 done
 
 echo "🛠 Installing systemd service units..."
-for svc in etc/system/systemd/*.service; do
-  sudo install -m 644 "$svc" /etc/systemd/system/
+SYSTEMD_SRC="etc/system/systemd"
+SYSTEMD_DST="/etc/systemd/system"
+
+for service_file in "$SYSTEMD_SRC"/*.service; do
+  if [ -f "$service_file" ]; then
+    service_name=$(basename "$service_file")
+    echo "→ Installing $service_name"
+    sudo cp "$service_file" "$SYSTEMD_DST/$service_name"
+  fi
 done
-sudo install -m 644 etc/system/systemd/smtphook.target /etc/systemd/system/
+
+if [ -f "$SYSTEMD_SRC/smtphook.target" ]; then
+  echo "→ Installing smtphook.target"
+  sudo cp "$SYSTEMD_SRC/smtphook.target" "$SYSTEMD_DST/smtphook.target"
+fi
+
 sudo systemctl daemon-reexec
 sudo systemctl daemon-reload
 
