@@ -1,0 +1,12 @@
+[Unit]
+Description=SMTPHook Parser
+
+[Container]
+Image=localhost/smtphook-golang_parser:latest
+Name=parser
+WorkingDir=%h/code/SMTPHook-Golang
+Volume=%h/code/SMTPHook-Golang/logs:/app/logs
+Volume=/opt/smtphook/parser/.env:/app/.env
+
+[Install]
+WantedBy=default.target
