@@ -1,64 +1,23 @@
 # SMTPHook
 
-SMTPHook is a modular email processing platform built in Go. It receives SMTP email, parses the content into structured JSON, and forwards it to a webhook endpoint for ingestion.
-
-It is **Ready**, with support for:
-- Systemd-managed services
-- Log rotation
-- Health checks
-- Retry logic
-- Polling for new messages
-- Podman or Docker containers (optional for testing)
+**SMTPHook** is a modular email processing platform written in Go. It receives SMTP email, parses the content into structured JSON, and sends it to your specified HTTP API endpoint — such as a PagerDuty or Opsgenie pager API.
 
 ---
 
-## 📁 Project Structure
+## ✅ Features
 
-```
-SMTPHook-Golang-main/
-├── parser/                    # Parses raw emails and sends structured JSON to webhook
-│   ├── main.go
-│   ├── go.mod
-│   ├── Dockerfile
-│   └── .env.example
-├── webhook/                  # Test webhook endpoint that receives parsed email JSON
-│   ├── main.go
-│   ├── go.mod
-│   ├── Dockerfile
-│   └── .env.example
-├── webhook-server/           # Production webhook receiver, saves logs and performs actions
-│   ├── main.go
-│   ├── go.mod
-│   ├── Dockerfile
-│   └── .env.example
-├── mailpit/                  # Dockerfile for Mailpit (SMTP debugging server)
-│   └── Dockerfile
-├── etc/
-│   ├── logrotate.d/
-│   │   ├── logrotate-smtphook.conf
-│   │   └── smtphook
-│   └── system/systemd/
-│       ├── parser.service
-│       ├── webhook.service
-│       ├── webhook-server.service
-│       ├── smtphook.service
-│       └── smtphook.target
-├── logs/                     # Auto-created log directory
-├── email.txt                 # Sample email for testing with swaks
-├── sample-email.json         # Sample webhook POST body
-├── podman-compose.yml        # Podman-compatible Docker Compose for all services
-├── Makefile                  # Build automation
-├── setup.sh                  # Full automatic setup
-├── uninstall.sh              # Clean uninstaller
-├── reset.sh                  # Resets everything (purge+uninstall+logs)
-├── run.sh                    # Manual start script (non-systemd)
-├── diagnose.sh               # Diagnostic tool
-└── README.md                 # This file
-```
+- Containerized with Podman + Quadlet
+- Polling loop for new messages
+- Retry logic for failed webhook delivery
+- Health endpoints
+- Optional Mailpit test SMTP server
+- One-command install & reset scripts
 
 ---
 
-## ⚡ Quick Start
+## 🚀 Getting Started
+
+### 1. Clone and install
 
 ```bash
 git clone https://github.com/your-user/SMTPHook-Golang.git
@@ -67,86 +26,91 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
-This script:
-- Installs dependencies (Go, Podman, pipx, swaks)
-- Builds and installs services
-- Sets up `.env` files and log folder
-- Copies systemd units
-- Starts services
-- Provides test samples
+### 2. Configure `.env` for `parser`
+
+Edit `parser/.env`:
+
+```env
+POLL_INTERVAL=5
+WEBHOOK_URL=http://your-api.local/pager-endpoint
+```
 
 ---
 
-## 🧪 Testing
+## ✉️ Sending Email
 
-### 📤 Send an email
+Use [swaks](https://github.com/JetBrains/swaks) or real services to test.
+
 ```bash
-swaks --to test@example.com --server localhost:1025 < email.txt
+swaks --to pager@example.com --server localhost:1025 < email.txt
 ```
 
-### 🌐 Test webhook directly
-```bash
-curl -X POST http://localhost:4000/email -H "Content-Type: application/json" -d @sample-email.json
+---
+
+## 📡 Webhook Delivery Format
+
+The `parser` sends structured JSON like:
+
+```json
+{
+  "from": "alerts@system.local",
+  "to": "pager@example.com",
+  "subject": "Critical alert",
+  "text": "Something went wrong."
+}
 ```
 
-### 🩺 Health check
+This is POSTed to your `WEBHOOK_URL`.
+
+---
+
+## 🩺 Health Check
+
+Each container has a `/health` endpoint:
+
 ```bash
 curl http://localhost:4000/health
 ```
 
 ---
 
-## 🛠 Service Management (systemd)
-
-```bash
-sudo systemctl status smtphook.target
-sudo journalctl -u parser.service -f
-```
-
----
-
-## 📦 Logrotate
-
-Log files are rotated daily via `logrotate`:
-```bash
-sudo cp etc/logrotate.d/smtphook /etc/logrotate.d/
-```
-
----
-
-## 🧼 Maintenance Scripts
+## 🔁 Maintenance Scripts
 
 | Script         | Description                             |
 |----------------|-----------------------------------------|
-| `setup.sh`     | Installs and configures everything      |
-| `uninstall.sh` | Removes all binaries, services, configs |
-| `reset.sh`     | Full purge, uninstall, and cleanup      |
-| `diagnose.sh`  | Diagnoses services, ports, logs         |
+| `setup.sh`     | Full automated setup                    |
+| `reset.sh`     | Remove containers, logs, and data       |
+| `uninstall.sh` | Purge everything                        |
+| `diagnose.sh`  | Show status of all containers and ports |
 
 ---
 
-## 📡 Internal Flow
+## 🧰 Folder Structure
 
-1. `Mailpit` listens on `1025`, receives emails.
-2. `parser` checks for new messages in polling loop, parses and sends JSON to webhook.
-3. `webhook` receives and logs JSON, forwards to `webhook-server`.
-4. `webhook-server` writes logs, performs actions.
-
----
-
-## ✅ Production Features
-
-- ⛑ Health endpoints on all services
-- ♻️ Retry logic on HTTP POST
-- 🔁 Polling loop to continuously process new messages
-- 🧠 Compatible with systemd targets and podman-compose
-- 🧪 Full local testing support via Mailpit + swaks
+```
+SMTPHook-Golang/
+├── parser/            # Polls, parses and sends email JSON
+├── webhook/           # Test webhook server
+├── webhook-server/    # Production webhook consumer
+├── etc/quadlet/       # Quadlet container definitions
+├── logs/              # Log output
+├── email.txt          # Sample test message
+├── sample-email.json  # Webhook sample payload
+├── setup.sh           # Main install script
+└── ...
+```
 
 ---
 
-## ⚙️ Customization
+## 🧩 Integration Tip
 
-Set `WEBHOOK_URL`, `POLL_INTERVAL`, etc. inside `.env` files under each service.
+Point `WEBHOOK_URL` in `.env` to any API that supports JSON input. For example:
+
+- PagerDuty Events API
+- Opsgenie Alert API
+- Your own HTTP service
+
+Use an adapter if needed to convert the payload format.
 
 ---
 
