@@ -1,6 +1,13 @@
 #!/bin/bash
 set -e
 
+# 🚫 Prevent running as root
+if [ "$EUID" -eq 0 ]; then
+  echo "❌ Do NOT run this script as root or with sudo."
+  echo "➡️  Please run: ./setup.sh"
+  exit 1
+fi
+
 echo "📁 Verifying you are in the correct project root directory..."
 
 EXPECTED_ITEMS=("parser" "webhook" "webhook-server" "Makefile" "etc" "setup.sh")
@@ -55,7 +62,6 @@ done
 
 echo "📁 Creating logs/ directory..."
 mkdir -p logs
-sudo chown "$(whoami)" logs 2>/dev/null || true
 
 echo "🔧 Copying .env.example files..."
 for dir in parser webhook webhook-server; do
@@ -68,17 +74,24 @@ done
 echo "🔨 Building services with Make..."
 make
 
-echo "🧹 Checking for conflicting Podman containers..."
-CONTAINERS=("smtp" "webhook" "webhook-server" "parser")
-for cname in "${CONTAINERS[@]}"; do
-  if podman container exists "$cname"; then
-    echo "⚠️  Removing stale container: $cname"
-    podman rm -f "$cname"
+echo "📦 Installing binaries to /opt/smtphook/bin..."
+sudo mkdir -p /opt/smtphook/bin
+sudo cp bin/* /opt/smtphook/bin
+
+echo "📁 Preparing /opt/smtphook service directories..."
+for dir in parser webhook webhook-server; do
+  sudo mkdir -p "/opt/smtphook/$dir"
+  if [ -f "$dir/.env" ]; then
+    sudo cp "$dir/.env" "/opt/smtphook/$dir/.env"
+    echo "✔️  /opt/smtphook/$dir/.env deployed"
   fi
 done
 
 echo "📬 Building and launching containers with Podman Compose..."
-podman-compose -f podman-compose.yml up -d
+podman-compose -f podman-compose.yml up -d --build
+
+echo "📁 Creating logs/ directory (again to ensure it exists)..."
+mkdir -p logs
 
 echo "🧪 Creating email.txt for swaks testing..."
 cat <<EOF > email.txt
