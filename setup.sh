@@ -86,6 +86,13 @@ sudo cp etc/system/systemd/smtphook.target /etc/systemd/system/
 sudo systemctl daemon-reexec
 sudo systemctl daemon-reload
 
+# Ensure webhook.service is enabled
+if [ -f /etc/systemd/system/webhook.service ]; then
+  echo "✔️  webhook.service installed"
+else
+  echo "❌ Missing webhook.service file in etc/system/systemd/"
+fi
+
 echo "🔌 Enabling and starting services..."
 sudo systemctl enable smtphook.target
 sudo systemctl start smtphook.target
