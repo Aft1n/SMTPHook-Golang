@@ -1,19 +1,27 @@
 #!/bin/bash
 set -e
 
-echo "🧹 Stopping Quadlet containers..."
+echo "🧨 Resetting SMTPHook environment..."
 
-for service in container-parser container-webhook container-webhook-server container-smtp; do
-  systemctl --user stop "$service.container" || true
-  systemctl --user disable "$service.container" || true
+CONTAINERS=("smtp" "webhook" "webhook-server" "parser")
+
+echo "🧹 Stopping and removing containers..."
+for cname in "${CONTAINERS[@]}"; do
+  if podman container exists "$cname"; then
+    echo "🛑 Removing $cname..."
+    podman rm -f "$cname"
+  fi
 done
 
-echo "🧹 Removing Quadlet files..."
-rm -f ~/.config/containers/systemd/container-*.container
-
-echo "🗑 Removing containers..."
-for name in smtphook-parser smtphook-webhook smtphook-webhook-server axllent/mailpit; do
-  podman rm -f "$(podman ps -aq --filter ancestor="$name")" || true
+echo "🧼 Removing old images..."
+for img in "${CONTAINERS[@]}"; do
+  if podman image exists "localhost/smtphook-golang_$img"; then
+    podman rmi -f "localhost/smtphook-golang_$img"
+  fi
 done
 
-echo "🧼 Cleanup complete!"
+echo "🗑 Cleaning logs and test files..."
+rm -f logs/*.log || true
+rm -f email.txt || true
+
+echo "♻️  Reset complete. You can now rerun ./setup.sh"
