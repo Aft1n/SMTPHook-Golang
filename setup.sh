@@ -55,7 +55,7 @@ done
 
 echo "📁 Creating logs/ directory..."
 mkdir -p logs
-sudo chown "$(whoami)":"$(whoami)" logs 2>/dev/null || true
+sudo chown "$(whoami)" logs 2>/dev/null || true
 
 echo "🔧 Copying .env.example files..."
 for dir in parser webhook webhook-server; do
@@ -81,9 +81,31 @@ for dir in parser webhook webhook-server; do
   fi
 done
 
+echo "👤 Ensuring system user 'smtphook' exists..."
+if ! id -u smtphook >/dev/null 2>&1; then
+  sudo useradd --system --no-create-home --shell /usr/sbin/nologin smtphook
+  echo "✔️  Created system user 'smtphook'"
+else
+  echo "✔️  System user 'smtphook' already exists"
+fi
+
 echo "🛠 Installing systemd service units..."
-sudo cp etc/system/systemd/*.service /etc/systemd/system/
-sudo cp etc/system/systemd/smtphook.target /etc/systemd/system/
+for svc in etc/system/systemd/*.service; do
+  base=$(basename "$svc")
+  target="/etc/systemd/system/$base"
+  if [ ! -f "$target" ]; then
+    sudo cp "$svc" "$target"
+    echo "✔️  Installed $base"
+  else
+    echo "⏩  Skipping $base (already exists)"
+  fi
+done
+
+# Install smtphook.target if missing
+if [ ! -f /etc/systemd/system/smtphook.target ]; then
+  sudo cp etc/system/systemd/smtphook.target /etc/systemd/system/
+fi
+
 sudo systemctl daemon-reexec
 sudo systemctl daemon-reload
 
