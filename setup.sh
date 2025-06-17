@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "🔍 Detecting OS and package manager..."
+echo "🔍 Detecting package manager..."
 if command -v apt-get &>/dev/null; then
   PM="apt"
 elif command -v dnf &>/dev/null; then
@@ -13,23 +13,26 @@ else
   exit 1
 fi
 
-echo "📦 Installing dependencies using $PM..."
+echo "📦 Installing dependencies with $PM..."
 
 case $PM in
   apt)
-    sudo apt-get update
-    sudo apt-get install -y golang git make podman python3-pip logrotate
-    sudo pip3 install podman-compose
+    sudo apt update
+    sudo apt install -y golang git make podman pipx logrotate
     ;;
   dnf)
-    sudo dnf install -y golang git make podman python3-pip logrotate
-    sudo pip3 install podman-compose
+    sudo dnf install -y golang git make podman python3-pip pipx logrotate
     ;;
   apk)
     sudo apk add go git make podman py3-pip logrotate
-    sudo pip3 install podman-compose
+    python3 -m ensurepip
+    pip3 install pipx
     ;;
 esac
+
+echo "🧰 Ensuring podman-compose is installed via pipx..."
+pipx install --force podman-compose
+export PATH="$HOME/.local/bin:$PATH"
 
 echo "📁 Creating logs/ directory..."
 mkdir -p logs
