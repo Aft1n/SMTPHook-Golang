@@ -3,7 +3,7 @@ set -e
 
 echo "📁 Verifying you are in the correct project root directory..."
 
-EXPECTED_ITEMS=("parser" "webhook" "webhook-server" "Makefile" "setup.sh" "podman-compose.yml")
+EXPECTED_ITEMS=("parser" "webhook" "webhook-server" "Makefile" "etc" "setup.sh")
 
 for item in "${EXPECTED_ITEMS[@]}"; do
   if [ ! -e "$item" ]; then
@@ -47,9 +47,11 @@ echo "🧰 Installing podman-compose with pipx..."
 pipx install --force podman-compose
 export PATH="$HOME/.local/bin:$PATH"
 
-echo "📁 Creating logs/ directory..."
-mkdir -p logs
-chmod 755 logs
+echo "🔧 Running go mod tidy for all services..."
+for dir in parser webhook webhook-server; do
+  echo "→ Tidying $dir"
+  (cd "$dir" && go mod tidy)
+done
 
 echo "🔧 Copying .env.example files..."
 for dir in parser webhook webhook-server; do
@@ -59,31 +61,43 @@ for dir in parser webhook webhook-server; do
   fi
 done
 
-echo "🧹 Running go mod tidy for all services..."
-for dir in parser webhook webhook-server; do
-  echo "→ Tidying $dir"
-  (cd "$dir" && go mod tidy)
-done
-
 echo "🔨 Building services with Make..."
 make
 
-echo "🐳 Starting all containers via Podman Compose..."
-podman-compose -f podman-compose.yml up -d
+echo "📁 Creating logs/ directory..."
+mkdir -p logs
 
-echo "📬 Ensuring containers restart on boot..."
-mkdir -p ~/.config/systemd/user
-podman generate systemd --files --name smtp
-podman generate systemd --files --name webhook
-podman generate systemd --files --name webhook-server
-podman generate systemd --files --name parser
+echo "📦 Creating /opt/smtphook and copying .env files..."
+sudo mkdir -p /opt/smtphook
+for dir in parser webhook webhook-server; do
+  sudo mkdir -p "/opt/smtphook/$dir"
+  if [ -f "$dir/.env" ]; then
+    sudo cp "$dir/.env" "/opt/smtphook/$dir/.env"
+    echo "✔️  /opt/smtphook/$dir/.env deployed"
+  fi
+done
 
-echo "🔁 Enabling user-level systemd services for containers..."
+echo "📦 Installing binaries to /opt/smtphook/bin..."
+sudo mkdir -p /opt/smtphook/bin
+sudo cp bin/* /opt/smtphook/bin
+
+echo "🛠 Setting up Quadlet .container units..."
+mkdir -p ~/.config/containers/systemd
+
+for unit in etc/systemd/*.container; do
+  cp "$unit" ~/.config/containers/systemd/
+  echo "✔️ Installed $(basename "$unit")"
+done
+
+echo "🔁 Enabling and starting container services via user-level systemd..."
 systemctl --user daemon-reload
-systemctl --user enable container-smtp.service
-systemctl --user enable container-webhook.service
-systemctl --user enable container-webhook-server.service
-systemctl --user enable container-parser.service
+systemctl --user enable --now container-smtp.service
+systemctl --user enable --now container-webhook.service
+systemctl --user enable --now container-webhook-server.service
+systemctl --user enable --now container-parser.service
+
+echo "🌀 Installing logrotate config..."
+sudo cp etc/logrotate.d/smtphook /etc/logrotate.d/
 
 echo "🧪 Creating email.txt for swaks testing..."
 cat <<EOF > email.txt
@@ -98,6 +112,6 @@ This is a test mailing
 EOF
 echo "✔️  email.txt created"
 
-echo "✅ Setup complete. All services are running as containers!"
+echo "✅ Setup complete. SMTPHook is running as containers!"
 echo "📤 You can test mail input with:"
 echo "    swaks --to test@example.com --server localhost:1025 < email.txt"
