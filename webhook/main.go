@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -38,17 +39,22 @@ func main() {
 			return
 		}
 
-		body := make([]byte, r.ContentLength)
-		_, err := r.Body.Read(body)
+		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, "Failed to read body", http.StatusInternalServerError)
 			log.Println("Failed to read body:", err)
 			return
 		}
-		r.Body.Close()
+		defer r.Body.Close()
 
 		log.Printf("[%s] Received email payload:\n%s\n", time.Now().Format(time.RFC3339), string(body))
 		w.WriteHeader(http.StatusOK)
+	})
+
+	// Health check endpoint
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
 	})
 
 	log.Fatal(http.ListenAndServe(":"+port, nil))
