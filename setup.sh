@@ -55,7 +55,7 @@ done
 
 echo "📁 Creating logs/ directory..."
 mkdir -p logs
-sudo chown "$(whoami)" logs 2>/dev/null || true
+sudo chown smtphook:smtphook logs || true
 
 echo "🔧 Copying .env.example files..."
 for dir in parser webhook webhook-server; do
@@ -72,6 +72,12 @@ echo "📦 Installing binaries to /opt/smtphook/bin..."
 sudo mkdir -p /opt/smtphook/bin
 sudo cp bin/* /opt/smtphook/bin
 
+echo "👤 Creating system user 'smtphook' if not exists..."
+if ! id -u smtphook &>/dev/null; then
+  sudo useradd --system --no-create-home --shell /usr/sbin/nologin smtphook
+  echo "✔️  User 'smtphook' created"
+fi
+
 echo "📁 Preparing /opt/smtphook service directories..."
 for dir in parser webhook webhook-server; do
   sudo mkdir -p "/opt/smtphook/$dir"
@@ -79,33 +85,14 @@ for dir in parser webhook webhook-server; do
     sudo cp "$dir/.env" "/opt/smtphook/$dir/.env"
     echo "✔️  /opt/smtphook/$dir/.env deployed"
   fi
+  sudo chown -R smtphook:smtphook "/opt/smtphook/$dir"
 done
-
-echo "👤 Ensuring system user 'smtphook' exists..."
-if ! id -u smtphook >/dev/null 2>&1; then
-  sudo useradd --system --no-create-home --shell /usr/sbin/nologin smtphook
-  echo "✔️  Created system user 'smtphook'"
-else
-  echo "✔️  System user 'smtphook' already exists"
-fi
 
 echo "🛠 Installing systemd service units..."
 for svc in etc/system/systemd/*.service; do
-  base=$(basename "$svc")
-  target="/etc/systemd/system/$base"
-  if [ ! -f "$target" ]; then
-    sudo cp "$svc" "$target"
-    echo "✔️  Installed $base"
-  else
-    echo "⏩  Skipping $base (already exists)"
-  fi
+  sudo install -m 644 "$svc" /etc/systemd/system/
 done
-
-# Install smtphook.target if missing
-if [ ! -f /etc/systemd/system/smtphook.target ]; then
-  sudo cp etc/system/systemd/smtphook.target /etc/systemd/system/
-fi
-
+sudo install -m 644 etc/system/systemd/smtphook.target /etc/systemd/system/
 sudo systemctl daemon-reexec
 sudo systemctl daemon-reload
 
