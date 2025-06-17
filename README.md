@@ -20,7 +20,7 @@
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/your-user/SMTPHook-Golang.git
+git clone git@github.com:voidwatch/SMTPHook-Golang.git
 cd SMTPHook-Golang
 chmod +x setup.sh
 ./setup.sh
