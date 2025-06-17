@@ -1,223 +1,155 @@
 # SMTPHook
 
-SMTPHook is a modular and containerized platform to receive, parse, and forward emails to webhooks. It is written in Go, supports Podman or Docker, and includes systemd units and logrotate config for production deployment.
+SMTPHook is a modular email processing platform built in Go. It receives SMTP email, parses the content into structured JSON, and forwards it to a webhook endpoint for ingestion.
+
+It is **Ready**, with support for:
+- Systemd-managed services
+- Log rotation
+- Health checks
+- Retry logic
+- Polling for new messages
+- Podman or Docker containers (optional for testing)
 
 ---
 
-## 🔧 Project Structure
+## 📁 Project Structure
 
 ```
-SMTPHook-Golang/
-├── parser/              # Converts raw SMTP email to structured JSON
-├── webhook/             # Test endpoint to receive parsed JSON
-├── webhook-server/      # Writes parsed JSON to logs or further handling
+SMTPHook-Golang-main/
+├── parser/                    # Parses raw emails and sends structured JSON to webhook
+│   ├── main.go
+│   ├── go.mod
+│   ├── Dockerfile
+│   └── .env.example
+├── webhook/                  # Test webhook endpoint that receives parsed email JSON
+│   ├── main.go
+│   ├── go.mod
+│   ├── Dockerfile
+│   └── .env.example
+├── webhook-server/           # Production webhook receiver, saves logs and performs actions
+│   ├── main.go
+│   ├── go.mod
+│   ├── Dockerfile
+│   └── .env.example
+├── mailpit/                  # Dockerfile for Mailpit (SMTP debugging server)
+│   └── Dockerfile
 ├── etc/
-│   ├── logrotate.d/     # Logrotate config for logs/*.log
-│   └── system/systemd/  # systemd unit files
-├── podman-compose.yml   # Container orchestration
-├── Makefile             # Build all services
-├── setup.sh             # Full setup script (install, build, configure)
-├── reset.sh             # Clean or purge installed state
-└── README.md            # You are here
+│   ├── logrotate.d/
+│   │   ├── logrotate-smtphook.conf
+│   │   └── smtphook
+│   └── system/systemd/
+│       ├── parser.service
+│       ├── webhook.service
+│       ├── webhook-server.service
+│       ├── smtphook.service
+│       └── smtphook.target
+├── logs/                     # Auto-created log directory
+├── email.txt                 # Sample email for testing with swaks
+├── sample-email.json         # Sample webhook POST body
+├── podman-compose.yml        # Podman-compatible Docker Compose for all services
+├── Makefile                  # Build automation
+├── setup.sh                  # Full automatic setup
+├── uninstall.sh              # Clean uninstaller
+├── reset.sh                  # Resets everything (purge+uninstall+logs)
+├── run.sh                    # Manual start script (non-systemd)
+├── diagnose.sh               # Diagnostic tool
+└── README.md                 # This file
 ```
 
 ---
 
-## 🚀 Quick Start
-
-### 1. Prerequisites
-
-Supported package managers:
-- ✅ `apt` (Debian/Ubuntu)
-- ✅ `dnf` (Fedora/RHEL/CentOS)
-- ✅ `apk` (Alpine)
-
-Required tools:
-- Go 1.21+
-- Podman or Docker
-- pipx (for podman-compose)
-- make, git, systemd
-
----
-
-### 2. Setup with One Command
+## ⚡ Quick Start
 
 ```bash
+git clone https://github.com/your-user/SMTPHook-Golang.git
+cd SMTPHook-Golang
 chmod +x setup.sh
 ./setup.sh
 ```
 
-This will:
-- Install required dependencies
-- Run `go mod tidy` for all services
-- Create `.env` files
-- Build and install all services to `/opt/smtphook/`
-- Install and start systemd services
-- Configure logrotate
-- Install `swaks` for email testing
-
-> Requires `sudo` access.
-
----
-
-## 🔁 Reset or Purge
-
-To clean up the environment without uninstalling:
-
-```bash
-./reset.sh
-```
-
-To remove everything, including systemd units, logs, and binaries:
-
-```bash
-./reset.sh --purge
-```
+This script:
+- Installs dependencies (Go, Podman, pipx, swaks)
+- Builds and installs services
+- Sets up `.env` files and log folder
+- Copies systemd units
+- Starts services
+- Provides test samples
 
 ---
 
 ## 🧪 Testing
 
-### Send test email into Mailpit:
-
+### 📤 Send an email
 ```bash
 swaks --to test@example.com --server localhost:1025 < email.txt
 ```
 
-### Manually test webhook:
-
+### 🌐 Test webhook directly
 ```bash
-curl -X POST http://localhost:4000/email      -H "Content-Type: application/json"      -d @sample-email.json
+curl -X POST http://localhost:4000/email -H "Content-Type: application/json" -d @sample-email.json
+```
+
+### 🩺 Health check
+```bash
+curl http://localhost:4000/health
 ```
 
 ---
 
-## 🧹 Log Rotation
+## 🛠 Service Management (systemd)
 
-Logs are written to `logs/*.log` and rotated via systemd cron (daily with compression):
+```bash
+sudo systemctl status smtphook.target
+sudo journalctl -u parser.service -f
+```
 
+---
+
+## 📦 Logrotate
+
+Log files are rotated daily via `logrotate`:
 ```bash
 sudo cp etc/logrotate.d/smtphook /etc/logrotate.d/
 ```
 
 ---
 
-## 🔁 Internal Request Flow
+## 🧼 Maintenance Scripts
 
-```
-SMTP Email (Mailpit) --> parser --> webhook --> webhook-server --> logs/
-```
-
-1. Mailpit receives SMTP email on port `1025`.
-2. `parser` reads and parses the email into JSON.
-3. `parser` POSTs the structured payload to the `webhook` endpoint.
-4. `webhook` forwards it to `webhook-server` or logs the result.
+| Script         | Description                             |
+|----------------|-----------------------------------------|
+| `setup.sh`     | Installs and configures everything      |
+| `uninstall.sh` | Removes all binaries, services, configs |
+| `reset.sh`     | Full purge, uninstall, and cleanup      |
+| `diagnose.sh`  | Diagnoses services, ports, logs         |
 
 ---
 
-## 📡 API Contract (Webhook)
+## 📡 Internal Flow
 
-### POST `/email`
-
-Example request:
-
-```json
-{
-  "from": "sender@domain.com",
-  "to": ["to@domain.com"],
-  "subject": "Subject text",
-  "body": "Message body",
-  "timestamp": "2025-06-17T12:00:00Z"
-}
-```
-
-### Responses
-
-- `200 OK` – Accepted
-- `400 Bad Request` – Invalid structure
-- `500 Internal Server Error` – Server failure
+1. `Mailpit` listens on `1025`, receives emails.
+2. `parser` checks for new messages in polling loop, parses and sends JSON to webhook.
+3. `webhook` receives and logs JSON, forwards to `webhook-server`.
+4. `webhook-server` writes logs, performs actions.
 
 ---
 
-## 🔧 Configure SMTPHook to Use Your API
+## ✅ Production Features
 
-1. Open `parser/.env` and change:
-
-```env
-WEBHOOK_URL=https://your-api.com/inbound-email
-```
-
-2. Optional auth:
-
-```env
-WEBHOOK_AUTH_HEADER=Authorization: Bearer YOUR_TOKEN
-```
-
-3. Rebuild or restart:
-
-```bash
-sudo systemctl restart smtphook.target
-```
-
-> The `parser` will now POST every structured email to your endpoint.
+- ⛑ Health endpoints on all services
+- ♻️ Retry logic on HTTP POST
+- 🔁 Polling loop to continuously process new messages
+- 🧠 Compatible with systemd targets and podman-compose
+- 🧪 Full local testing support via Mailpit + swaks
 
 ---
 
-## 🐞 Debugging Tips
+## ⚙️ Customization
 
-### Logs
-
-```bash
-journalctl -u parser.service -f
-tail -f logs/parser.log
-```
-
-### Check services
-
-```bash
-systemctl status smtphook.target
-podman ps
-```
-
-### Validate test email flow
-
-```bash
-swaks --to test@x.com --server localhost:1025 --data email.txt
-```
+Set `WEBHOOK_URL`, `POLL_INTERVAL`, etc. inside `.env` files under each service.
 
 ---
 
-## 📂 Environment Variable Reference
+## License
 
-| Service         | Variable            | Default         | Description                     |
-|-----------------|---------------------|------------------|---------------------------------|
-| All             | `PORT`              | `4000`           | Service port                    |
-| All             | `LOG_FILE_PATH`     | `logs/*.log`     | Log output file                 |
-| parser          | `EMAIL_INPUT_FILE`  | (optional)       | Path to raw input               |
-| parser          | `WEBHOOK_URL`       | http://webhook   | Destination API URL             |
-| parser          | `WEBHOOK_AUTH_HEADER` | (optional)     | Auth header for outbound POSTs  |
-
----
-
-## 🙋 FAQ
-
-**Q: Can I use Docker instead of Podman?**  
-Yes. Just replace `podman-compose` with `docker-compose`.
-
-**Q: Is this production ready?**  
-Yes — systemd units, logrotate, and isolated binaries included.
-
-**Q: Is Mailpit required in production?**  
-No — it's for local testing only. Disable it in `podman-compose.yml` if not needed.
-
----
-
-## 🤝 Contributing
-
-Feel free to file issues or send PRs. All feedback and patches are welcome.
-
----
-
-## 📜 License
-
-MIT — free to use, fork, and redistribute.
+MIT
