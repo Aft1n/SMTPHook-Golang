@@ -27,6 +27,11 @@ func ingestHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+    // Create logs/ directory if it doesn't exist
+    err := os.MkdirAll("logs", 0755)
+    if err != nil {
+        log.Fatalf("Failed to create logs directory: %v", err)
+    }
 	_ = godotenv.Load()
 
 	port := os.Getenv("PORT")
