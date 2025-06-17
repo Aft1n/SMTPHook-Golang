@@ -64,15 +64,14 @@ for dir in parser webhook webhook-server; do
 done
 
 echo "📄 Creating sample email.txt for testing..."
-cat <<EOF > email.txt
-Date: $(date -R)
+cat > email.txt <<EOF
+Date: $(date)
 To: test@example.com
-From: void@Nexus
-Subject: test $(date -R)
+From: void@localhost
+Subject: test $(date)
 
 This is a test mailing
 EOF
-echo "✔️  email.txt created"
 
 echo "🔨 Building services with Make..."
 make
@@ -90,6 +89,11 @@ for dir in parser webhook webhook-server; do
   fi
 done
 
+# ✅ NEW: Create /opt/smtphook/logs so all services can write their logs
+echo "📁 Creating /opt/smtphook/logs directory..."
+sudo mkdir -p /opt/smtphook/logs
+sudo chown -R $USER:$USER /opt/smtphook/logs
+
 echo "🛠 Installing systemd service units..."
 sudo cp etc/system/systemd/*.service /etc/systemd/system/
 sudo cp etc/system/systemd/smtphook.target /etc/systemd/system/
@@ -97,9 +101,6 @@ sudo systemctl daemon-reexec
 sudo systemctl daemon-reload
 
 echo "🔌 Enabling and starting services..."
-sudo systemctl enable parser.service
-sudo systemctl enable webhook.service
-sudo systemctl enable webhook-server.service
 sudo systemctl enable smtphook.target
 sudo systemctl start smtphook.target
 
@@ -107,5 +108,5 @@ echo "🌀 Installing logrotate config..."
 sudo cp etc/logrotate.d/smtphook /etc/logrotate.d/
 
 echo "✅ Setup complete. SMTPHook is running!"
-echo "📤 Test email with:"
+echo "📤 You can now test mail input with:"
 echo "    swaks --to test@example.com --server localhost:1025 < email.txt"
