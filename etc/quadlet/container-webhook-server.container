@@ -1,0 +1,13 @@
+[Unit]
+Description=SMTPHook Webhook Server
+
+[Container]
+Image=localhost/smtphook-golang_webhook-server:latest
+Name=webhook-server
+PublishPort=4001:4001
+WorkingDir=%h/code/SMTPHook-Golang
+Volume=%h/code/SMTPHook-Golang/logs:/app/logs
+Volume=/opt/smtphook/webhook-server/.env:/app/.env
+
+[Install]
+WantedBy=default.target
