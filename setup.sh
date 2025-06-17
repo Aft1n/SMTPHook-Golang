@@ -26,6 +26,7 @@ else
 fi
 
 echo "📦 Installing dependencies with $PM..."
+
 case $PM in
   apt)
     sudo apt update
@@ -47,17 +48,24 @@ pipx install --force podman-compose
 export PATH="$HOME/.local/bin:$PATH"
 
 echo "📬 Installing Mailpit..."
-if ! command -v mailpit &>/dev/null; then
-  curl -sSL https://api.github.com/repos/axllent/mailpit/releases/latest \
-    | grep "browser_download_url.*linux-amd64" \
-    | cut -d '"' -f 4 \
-    | wget -qi - -O mailpit
-  chmod +x mailpit
-  sudo mv mailpit /usr/local/bin/
-  echo "✔️  Mailpit installed"
+MAILPIT_VERSION="v1.14.2"
+MAILPIT_URL="https://github.com/axllent/mailpit/releases/download/${MAILPIT_VERSION}/mailpit_${MAILPIT_VERSION}_linux_amd64.tar.gz"
+
+TMP_DIR="$(mktemp -d)"
+curl -L "$MAILPIT_URL" -o "$TMP_DIR/mailpit.tar.gz"
+
+tar -xzf "$TMP_DIR/mailpit.tar.gz" -C "$TMP_DIR"
+
+if [ -f "$TMP_DIR/mailpit" ]; then
+  sudo cp "$TMP_DIR/mailpit" /opt/smtphook/bin/
+  sudo chmod +x /opt/smtphook/bin/mailpit
+  echo "✔️  Mailpit installed to /opt/smtphook/bin/mailpit"
 else
-  echo "✔️  Mailpit already installed"
+  echo "❌ Failed to install Mailpit: binary not found in archive"
+  exit 1
 fi
+
+rm -rf "$TMP_DIR"
 
 echo "🧹 Running go mod tidy for all services..."
 for dir in parser webhook webhook-server; do
@@ -94,22 +102,14 @@ for dir in parser webhook webhook-server; do
 done
 
 echo "🛠 Installing systemd service units..."
-SYSTEMD_DIR="/etc/systemd/system"
-
-for service in etc/system/systemd/*.service; do
-  service_name=$(basename "$service")
-  sudo cp "$service" "$SYSTEMD_DIR/$service_name"
-done
-
-sudo cp etc/system/systemd/smtphook.target "$SYSTEMD_DIR/"
+sudo cp etc/system/systemd/*.service /etc/systemd/system/
+sudo cp etc/system/systemd/smtphook.target /etc/systemd/system/
 sudo systemctl daemon-reexec
 sudo systemctl daemon-reload
 
 echo "🔌 Enabling and starting services..."
 sudo systemctl enable smtphook.target
-sudo systemctl enable mailpit.service
 sudo systemctl start smtphook.target
-sudo systemctl start mailpit.service
 
 echo "🌀 Installing logrotate config..."
 sudo cp etc/logrotate.d/smtphook /etc/logrotate.d/
@@ -130,4 +130,3 @@ echo "✔️  email.txt created"
 echo "✅ Setup complete. SMTPHook is running!"
 echo "📤 You can now test mail input with:"
 echo "    swaks --to test@example.com --server localhost:1025 < email.txt"
-echo "📨 Mailpit web UI is available at: http://localhost:8025"
