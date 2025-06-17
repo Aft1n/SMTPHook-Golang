@@ -3,7 +3,7 @@ set -e
 
 echo "📁 Verifying you are in the correct project root directory..."
 
-EXPECTED_ITEMS=("parser" "webhook" "webhook-server" "Makefile" "etc" "setup.sh")
+EXPECTED_ITEMS=("parser" "webhook" "webhook-server" "Makefile" "setup.sh" "podman-compose.yml")
 
 for item in "${EXPECTED_ITEMS[@]}"; do
   if [ ! -e "$item" ]; then
@@ -12,12 +12,6 @@ for item in "${EXPECTED_ITEMS[@]}"; do
     exit 1
   fi
 done
-
-USE_CONTAINERS=false
-if [[ "$1" == "--container" ]]; then
-  USE_CONTAINERS=true
-  echo "🧱 Container mode enabled"
-fi
 
 echo "🔍 Detecting package manager..."
 if command -v apt-get &>/dev/null; then
@@ -53,32 +47,9 @@ echo "🧰 Installing podman-compose with pipx..."
 pipx install --force podman-compose
 export PATH="$HOME/.local/bin:$PATH"
 
-# 🧱 Container mode (optional)
-if $USE_CONTAINERS; then
-  echo "📦 Starting services using Podman Compose..."
-
-  if [ -f podman-compose.yml ] || [ -f docker-compose.yml ]; then
-    COMPOSE_FILE="podman-compose.yml"
-    [ -f docker-compose.yml ] && COMPOSE_FILE="docker-compose.yml"
-    podman-compose -f "$COMPOSE_FILE" up -d --build
-    echo "✔️  Containers started using $COMPOSE_FILE"
-  else
-    echo "❌ Could not find podman-compose.yml or docker-compose.yml"
-    exit 1
-  fi
-  echo "✅ Container setup complete. Exiting."
-  exit 0
-fi
-
-echo "🧹 Running go mod tidy for all services..."
-for dir in parser webhook webhook-server; do
-  echo "→ Tidying $dir"
-  (cd "$dir" && go mod tidy)
-done
-
 echo "📁 Creating logs/ directory..."
 mkdir -p logs
-sudo chown "$(whoami)" logs 2>/dev/null || true
+chmod 755 logs
 
 echo "🔧 Copying .env.example files..."
 for dir in parser webhook webhook-server; do
@@ -88,42 +59,31 @@ for dir in parser webhook webhook-server; do
   fi
 done
 
+echo "🧹 Running go mod tidy for all services..."
+for dir in parser webhook webhook-server; do
+  echo "→ Tidying $dir"
+  (cd "$dir" && go mod tidy)
+done
+
 echo "🔨 Building services with Make..."
 make
 
-echo "📦 Installing binaries to /opt/smtphook/bin..."
-sudo mkdir -p /opt/smtphook/bin
-sudo cp bin/* /opt/smtphook/bin
+echo "🐳 Starting all containers via Podman Compose..."
+podman-compose -f podman-compose.yml up -d
 
-echo "📁 Preparing /opt/smtphook service directories..."
-for dir in parser webhook webhook-server; do
-  sudo mkdir -p "/opt/smtphook/$dir"
-  if [ -f "$dir/.env" ]; then
-    sudo cp "$dir/.env" "/opt/smtphook/$dir/.env"
-    echo "✔️  /opt/smtphook/$dir/.env deployed"
-  fi
-done
+echo "📬 Ensuring containers restart on boot..."
+mkdir -p ~/.config/systemd/user
+podman generate systemd --files --name smtp
+podman generate systemd --files --name webhook
+podman generate systemd --files --name webhook-server
+podman generate systemd --files --name parser
 
-# Ensure a system user exists for services
-if ! id "smtphook" &>/dev/null; then
-  echo "👤 Creating system user: smtphook"
-  sudo useradd --system --no-create-home --shell /usr/sbin/nologin smtphook
-fi
-
-echo "🛠 Installing systemd service units..."
-for service_file in etc/system/systemd/*.service; do
-  sudo cp "$service_file" /etc/systemd/system/
-done
-sudo cp etc/system/systemd/smtphook.target /etc/systemd/system/
-sudo systemctl daemon-reexec
-sudo systemctl daemon-reload
-
-echo "🔌 Enabling and starting services..."
-sudo systemctl enable smtphook.target
-sudo systemctl start smtphook.target
-
-echo "🌀 Installing logrotate config..."
-sudo cp etc/logrotate.d/smtphook /etc/logrotate.d/
+echo "🔁 Enabling user-level systemd services for containers..."
+systemctl --user daemon-reload
+systemctl --user enable container-smtp.service
+systemctl --user enable container-webhook.service
+systemctl --user enable container-webhook-server.service
+systemctl --user enable container-parser.service
 
 echo "🧪 Creating email.txt for swaks testing..."
 cat <<EOF > email.txt
@@ -138,6 +98,6 @@ This is a test mailing
 EOF
 echo "✔️  email.txt created"
 
-echo "✅ Setup complete. SMTPHook is running!"
-echo "📤 You can now test mail input with:"
+echo "✅ Setup complete. All services are running as containers!"
+echo "📤 You can test mail input with:"
 echo "    swaks --to test@example.com --server localhost:1025 < email.txt"
