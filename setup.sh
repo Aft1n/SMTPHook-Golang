@@ -109,4 +109,4 @@ fi
 
 echo "✅ Setup complete. SMTPHook is running!"
 echo "📤 You can now test mail input with:"
-echo "    swaks --to test@example.com --server localhost:1025 --data email.txt"
+echo "swaks --to test@example.com --server localhost:1025 < email.txt"
