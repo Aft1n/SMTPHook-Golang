@@ -71,6 +71,11 @@ func writeLog(entry LogEntry, logPath string) {
 }
 
 func main() {
+    // Create logs/ directory if it doesn't exist
+    err := os.MkdirAll("logs", 0755)
+    if err != nil {
+        log.Fatalf("Failed to create logs directory: %v", err)
+    }
 	_ = godotenv.Load()
 
 	logPath := os.Getenv("LOG_FILE_PATH")
