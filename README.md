@@ -31,6 +31,26 @@ SMTPHook-Golang-main/
 - [Podman](https://podman.io/) and [podman-compose](https://github.com/containers/podman-compose)
 - `make`, `systemd`, and `git` (for build and deployment)
 
+
+
+### 2. Setup with One Command
+
+Use the provided `setup.sh` script to fully install and configure everything:
+
+```bash
+chmod +x setup.sh
+./setup.sh
+```
+
+This will:
+- Install all dependencies (Go, Podman, etc.) based on your system
+- Create `.env` files if missing
+- Build and install all services
+- Set up systemd unit files
+- Start the services and apply logrotate config
+
+> ⚠️ Requires `sudo` and supports most Linux distros (`apt`, `dnf`, `apk`)
+
 ---
 
 ### 2. Clone and Launch
@@ -49,21 +69,7 @@ chmod +x run.sh
 
 ---
 
-## 🛠️ Manual Build & Install
 
-To build all services:
-```bash
-make
-```
-
-To install binaries into `/opt/smtphook/bin`:
-```bash
-sudo make install
-```
-
----
-
-## 🧩 Systemd Setup (Optional)
 
 ```bash
 sudo cp etc/system/systemd/*.service /etc/systemd/system/
