@@ -3,13 +3,11 @@ Description=SMTPHook Webhook Receiver
 After=network.target
 
 [Service]
-ExecStart=/usr/local/bin/webhook-server
+Type=simple
+ExecStart=/opt/smtphook/bin/webhook-server
 WorkingDirectory=/opt/smtphook/webhook-server
-StandardOutput=file:/opt/smtphook/logs/webhook.log
-StandardError=file:/opt/smtphook/logs/webhook.log
 Restart=always
-User=nobody
-EnvironmentFile=/opt/smtphook/.env
+EnvironmentFile=/opt/smtphook/webhook-server/.env
 
 [Install]
 WantedBy=multi-user.target
