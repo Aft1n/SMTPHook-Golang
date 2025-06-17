@@ -1,6 +1,6 @@
 # SMTPHook
 
-SMTPHook is a modular and containerized platform to receive, parse, and forward emails to webhooks. It is written entirely in Go, uses Podman (or Docker) and is ready with systemd and logrotate support.
+SMTPHook is a modular and containerized platform to receive, parse, and forward emails to webhooks. It is written entirely in Go, uses Podman (or Docker), and supports systemd and logrotate for production readiness.
 
 ---
 
@@ -14,158 +14,109 @@ SMTPHook-Golang-main/
 ├── mailpit/             # SMTP capture and debugging via Mailpit
 ├── etc/
 │   ├── logrotate.d/     # Log rotation configs
-│   └── system/systemd/  # systemd service units for each component
+│   └── system/systemd/  # systemd unit files
 ├── podman-compose.yml   # Container orchestration
+├── Makefile             # Build & install automation
+├── run.sh               # Quick start script
 └── README.md            # You are here
 ```
 
 ---
 
-## 🚀 Quick Start (Using Podman Compose)
+## 🚀 Quick Start
 
 ### 1. Prerequisites
 
-- [Go 1.21+](https://go.dev/dl/) (required to build services)
+- [Go 1.21+](https://go.dev/dl/)
 - [Podman](https://podman.io/) and [podman-compose](https://github.com/containers/podman-compose)
-- `git`, `make`, and `systemd` (for development and deployment)
-
-
-- [Podman](https://podman.io/) and [podman-compose](https://github.com/containers/podman-compose)
-- `git` and `make` (optional but useful)
-- Linux system with `systemd` (for system services)
-
-### 2. Clone the Repository
-
-```bash
-git clone https://your-repo-url/SMTPHook-Golang-main.git
-cd SMTPHook-Golang-main
-```
-
-### 3. Configure `.env` files
-
-Each service has a `.env.example`. Create real `.env` files:
-
-```bash
-cp parser/.env.example parser/.env
-cp webhook/.env.example webhook/.env
-cp webhook-server/.env.example webhook-server/.env
-```
-
-Adjust values if needed (ports, log paths, etc.)
+- `make`, `systemd`, and `git` (for build and deployment)
 
 ---
 
-### 4. Build All Services
+### 2. Clone and Launch
 
 ```bash
-podman-compose -f podman-compose.yml build
+git clone git@github.com:voidwatch/SMTPHook-Golang.git
+cd SMTPHook-Golang
+chmod +x run.sh
+./run.sh
 ```
 
-### 5. Run the Stack
-
-```bash
-podman-compose -f podman-compose.yml up
-```
-
-> The following ports are used:
-> - Mailpit SMTP: `1025`
-> - Mailpit Web UI: `8025`
-> - Webhook: `4000`
-> - Webhook-server: `4000`
+> This ensures:
+> - All `.env` files are created if missing
+> - All services are built into `bin/`
+> - Stack is started via `podman-compose`
 
 ---
 
-## 🛠️ Manual Build (without containers)
+## 🛠️ Manual Build & Install
 
-Install Go dependencies first:
+To build all services:
 ```bash
-go mod tidy
+make
 ```
 
-
-You can build each Go service manually:
-
+To install binaries into `/opt/smtphook/bin`:
 ```bash
-cd parser
-go build -o ../bin/parser
-
-cd ../webhook
-go build -o ../bin/webhook
-
-cd ../webhook-server
-go build -o ../bin/webhook-server
+sudo make install
 ```
-
-Run each manually or via systemd (see below).
 
 ---
 
-## 🧩 Systemd Setup
-
-To install system-wide services:
+## 🧩 Systemd Setup (Optional)
 
 ```bash
 sudo cp etc/system/systemd/*.service /etc/systemd/system/
+sudo cp etc/system/systemd/smtphook.target /etc/systemd/system/
 sudo systemctl daemon-reexec
 sudo systemctl daemon-reload
-sudo systemctl enable smtphook.service
-sudo systemctl start smtphook.service
+sudo systemctl enable smtphook.target
+sudo systemctl start smtphook.target
 ```
-
-Adjust each service if paths to binaries or working directories differ.
 
 ---
 
 ## 🧹 Log Rotation
 
-Log files are written to `logs/*.log` by default.
-
-Ensure logrotate is configured:
-
 ```bash
 sudo cp etc/logrotate.d/smtphook /etc/logrotate.d/
 ```
 
-Check logs:
-```bash
-tail -f logs/webhook.log
-```
+Log files are written to `logs/*.log`. They are rotated daily with compression.
 
 ---
 
 ## 🧪 Testing
 
-### Test Email Input
-
-You can send a fake email to `Mailpit` using any SMTP client:
+### Send a fake email
 
 ```bash
 swaks --to test@example.com --server localhost:1025 --data email.txt
 ```
 
-### Test Webhook Handler
+### Test the webhook directly
 
 ```bash
-curl -X POST http://localhost:4000/email      -H "Content-Type: application/json"      -d @sample-email.json
+curl -X POST http://localhost:4000/email -H "Content-Type: application/json" -d @sample-email.json
 ```
 
 ---
 
 ## 📂 Environment Variable Reference
 
-| Service         | Variable         | Default Value          | Description                          |
-|-----------------|------------------|-------------------------|--------------------------------------|
-| All             | `PORT`           | `4000`                  | Port the service listens on          |
-| All             | `LOG_FILE_PATH`  | `logs/*.log`            | Path to log output                   |
-| parser          | `EMAIL_INPUT_FILE` | (empty)              | Path to raw email input file (or use stdin) |
+| Service         | Variable            | Default Value    | Description                          |
+|-----------------|---------------------|------------------|--------------------------------------|
+| All             | `PORT`              | `4000`           | Port the service listens on          |
+| All             | `LOG_FILE_PATH`     | `logs/*.log`     | Path to log output                   |
+| parser          | `EMAIL_INPUT_FILE`  | (empty)          | Path to raw email input file         |
 
 ---
 
 ## 📎 Notes
 
-- Use `podman-compose` or `docker-compose` depending on your environment.
-- Make sure `logs/` directory exists or is writable before starting.
-- `Mailpit` is included for local SMTP testing and can be removed in production.
+- `podman-compose` or `docker-compose` can be used interchangeably.
+- `logs/` directory is automatically created if it does not exist.
+- `Mailpit` is provided for local SMTP testing and is optional in production.
 
 ---
 
@@ -181,7 +132,7 @@ MIT — free to use, modify, and distribute.
 Yes. Just replace `podman-compose` with `docker-compose`.
 
 **Q: Is this production ready?**  
-Yes, with systemd, logrotate, and modular components, it is designed for long-running environments.
+Yes — with systemd, logrotate, and isolated components, it’s designed for long-running environments.
 
 **Q: Does this use any external databases?**  
 No — logs are written to files for simplicity.
