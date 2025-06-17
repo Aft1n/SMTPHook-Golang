@@ -7,6 +7,9 @@ services:
     ports:
       - "8025:8025"    # Mailpit Web UI
       - "1025:1025"    # SMTP Port
+    restart: unless-stopped
+    volumes:
+      - ./logs:/data
     networks:
       - smtphook
 
@@ -16,6 +19,7 @@ services:
     container_name: webhook
     ports:
       - "4000:4000"
+    restart: unless-stopped
     networks:
       - smtphook
 
@@ -24,20 +28,24 @@ services:
       context: ./webhook-server
     container_name: webhook-server
     ports:
-      - "4001:4001"
+      - "5000:5000"
+    restart: unless-stopped
     networks:
       - smtphook
+    depends_on:
+      - webhook
 
   parser:
     build:
       context: ./parser
     container_name: parser
+    restart: unless-stopped
+    networks:
+      - smtphook
     depends_on:
       - smtp
       - webhook
       - webhook-server
-    networks:
-      - smtphook
 
 networks:
   smtphook:
