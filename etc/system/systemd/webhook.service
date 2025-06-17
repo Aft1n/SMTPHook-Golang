@@ -5,11 +5,8 @@ After=network.target
 [Service]
 ExecStart=/opt/smtphook/bin/webhook
 WorkingDirectory=/opt/smtphook/webhook
-EnvironmentFile=/opt/smtphook/webhook/.env
 Restart=always
-RestartSec=5
-StandardOutput=journal
-StandardError=journal
+EnvironmentFile=/opt/smtphook/webhook/.env
 
 [Install]
 WantedBy=smtphook.target
