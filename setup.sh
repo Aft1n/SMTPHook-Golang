@@ -93,6 +93,20 @@ sudo systemctl start smtphook.target
 echo "🌀 Installing logrotate config..."
 sudo cp etc/logrotate.d/smtphook /etc/logrotate.d/
 
+echo "🧪 Creating sample email.txt for testing..."
+if [ ! -f email.txt ]; then
+cat <<EOF > email.txt
+From: sender@example.com
+To: test@example.com
+Subject: Test Email
+
+This is a test message sent via swaks.
+EOF
+  echo "✔️  email.txt created"
+else
+  echo "ℹ️  email.txt already exists"
+fi
+
 echo "✅ Setup complete. SMTPHook is running!"
 echo "📤 You can now test mail input with:"
 echo "    swaks --to test@example.com --server localhost:1025 --data email.txt"
