@@ -13,6 +13,12 @@ for item in "${EXPECTED_ITEMS[@]}"; do
   fi
 done
 
+USE_CONTAINERS=false
+if [[ "$1" == "--container" ]]; then
+  USE_CONTAINERS=true
+  echo "🧱 Container mode enabled"
+fi
+
 echo "🔍 Detecting package manager..."
 if command -v apt-get &>/dev/null; then
   PM="apt"
@@ -47,15 +53,21 @@ echo "🧰 Installing podman-compose with pipx..."
 pipx install --force podman-compose
 export PATH="$HOME/.local/bin:$PATH"
 
-echo "📬 Starting Mailpit via Podman Compose..."
-if [ -f podman-compose.yml ] || [ -f docker-compose.yml ]; then
-  COMPOSE_FILE="podman-compose.yml"
-  [ -f docker-compose.yml ] && COMPOSE_FILE="docker-compose.yml"
-  podman-compose -f "$COMPOSE_FILE" up -d smtp
-  echo "✔️  Mailpit container started using $COMPOSE_FILE"
-else
-  echo "❌ Could not find podman-compose.yml or docker-compose.yml"
-  exit 1
+# 🧱 Container mode (optional)
+if $USE_CONTAINERS; then
+  echo "📦 Starting services using Podman Compose..."
+
+  if [ -f podman-compose.yml ] || [ -f docker-compose.yml ]; then
+    COMPOSE_FILE="podman-compose.yml"
+    [ -f docker-compose.yml ] && COMPOSE_FILE="docker-compose.yml"
+    podman-compose -f "$COMPOSE_FILE" up -d --build
+    echo "✔️  Containers started using $COMPOSE_FILE"
+  else
+    echo "❌ Could not find podman-compose.yml or docker-compose.yml"
+    exit 1
+  fi
+  echo "✅ Container setup complete. Exiting."
+  exit 0
 fi
 
 echo "🧹 Running go mod tidy for all services..."
@@ -91,6 +103,12 @@ for dir in parser webhook webhook-server; do
     echo "✔️  /opt/smtphook/$dir/.env deployed"
   fi
 done
+
+# Ensure a system user exists for services
+if ! id "smtphook" &>/dev/null; then
+  echo "👤 Creating system user: smtphook"
+  sudo useradd --system --no-create-home --shell /usr/sbin/nologin smtphook
+fi
 
 echo "🛠 Installing systemd service units..."
 for service_file in etc/system/systemd/*.service; do
