@@ -142,3 +142,92 @@ No — logs are written to files for simplicity.
 ## 🤝 Contributing
 
 Pull requests and issues are welcome! Please file bugs or feature requests via GitHub Issues.
+
+
+---
+
+## 🔁 Internal Request Flow
+
+Here’s how the components communicate internally:
+
+1. **Mailpit** receives raw SMTP email on port `1025`.
+2. `parser` fetches emails (either from Mailpit API or stdin/file) and converts them to structured JSON.
+3. The structured output is sent via HTTP POST to the `webhook` endpoint (http://webhook:4000/email).
+4. `webhook` forwards the parsed data to `webhook-server`, or logs it directly to file for ingestion testing.
+
+> The `parser` acts as the central translation engine between raw SMTP and structured webhook JSON.
+
+---
+
+## 📡 API Contract (Webhook)
+
+### POST `/email`
+
+Used by `parser` to send structured email data.
+
+#### Request Body (application/json)
+
+```json
+{
+  "from": "example@domain.com",
+  "to": ["recipient@domain.com"],
+  "subject": "Test Email",
+  "body": "This is a test message.",
+  "timestamp": "2025-06-17T12:34:56Z"
+}
+```
+
+#### Response
+
+- `200 OK`: Accepted
+- `400 Bad Request`: Malformed payload
+- `500 Internal Server Error`: Downstream failure
+
+---
+
+## 🐞 Debugging Tips
+
+### 1. View Service Logs
+
+If using containers:
+```bash
+podman logs parser
+podman logs webhook
+podman logs webhook-server
+```
+
+If using systemd:
+```bash
+journalctl -u parser.service -f
+```
+
+### 2. Verify HTTP Requests
+
+Use curl or a tool like Postman:
+```bash
+curl -X POST http://localhost:4000/email -H "Content-Type: application/json" -d @sample-email.json
+```
+
+### 3. Inspect Log Files
+
+Logs are written to `logs/`:
+```bash
+tail -f logs/parser.log
+tail -f logs/webhook.log
+```
+
+### 4. Common Issues
+
+| Symptom | Likely Cause | Fix |
+|--------|---------------|-----|
+| No logs generated | `logs/` missing or unwritable | `mkdir -p logs/` |
+| 400 error on webhook | Malformed JSON payload | Validate structure |
+| Container crash | Missing `.env` or port conflict | Check `.env` values |
+
+---
+
+## 🧠 Developer Tips
+
+- Build individual services locally with `go build -o bin/<name>` inside each subdirectory.
+- Use `log.Println()` for temporary debug logging.
+- Implement `/health` endpoint in each service for integration with health checks.
