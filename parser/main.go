@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"io"
 
 	"github.com/joho/godotenv"
 )
@@ -28,86 +29,89 @@ type LogEntry struct {
 }
 
 func parseEmail(input string) ParsedEmail {
+	var subject, from, to, date, body string
 	scanner := bufio.NewScanner(strings.NewReader(input))
-	email := ParsedEmail{}
-	bodyLines := []string{}
-	isBody := false
 
+	readBody := false
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "" {
-			isBody = true
+			readBody = true
 			continue
 		}
-		if isBody {
-			bodyLines = append(bodyLines, line)
-		} else if strings.HasPrefix(line, "Subject:") {
-			email.Subject = strings.TrimPrefix(line, "Subject: ")
-		} else if strings.HasPrefix(line, "From:") {
-			email.From = strings.TrimPrefix(line, "From: ")
-		} else if strings.HasPrefix(line, "To:") {
-			email.To = strings.TrimPrefix(line, "To: ")
-		} else if strings.HasPrefix(line, "Date:") {
-			email.Date = strings.TrimPrefix(line, "Date: ")
+		if !readBody {
+			if strings.HasPrefix(line, "Subject:") {
+				subject = strings.TrimSpace(strings.TrimPrefix(line, "Subject:"))
+			} else if strings.HasPrefix(line, "From:") {
+				from = strings.TrimSpace(strings.TrimPrefix(line, "From:"))
+			} else if strings.HasPrefix(line, "To:") {
+				to = strings.TrimSpace(strings.TrimPrefix(line, "To:"))
+			} else if strings.HasPrefix(line, "Date:") {
+				date = strings.TrimSpace(strings.TrimPrefix(line, "Date:"))
+			}
+		} else {
+			body += line + "\n"
 		}
 	}
-	email.Body = strings.Join(bodyLines, "\n")
-	return email
-}
 
-func writeLog(entry LogEntry, logPath string) {
-	file, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		log.Fatalf("error opening log file: %v", err)
+	return ParsedEmail{
+		Subject: subject,
+		From:    from,
+		To:      to,
+		Date:    date,
+		Body:    strings.TrimSpace(body),
 	}
-	defer file.Close()
-
-	jsonData, err := json.Marshal(entry)
-	if err != nil {
-		log.Printf("error marshaling log entry: %v", err)
-		return
-	}
-	file.WriteString(string(jsonData) + "\n")
 }
 
 func main() {
-    // Create logs/ directory if it doesn't exist
-    err := os.MkdirAll("logs", 0755)
-    if err != nil {
-        log.Fatalf("Failed to create logs directory: %v", err)
-    }
-	_ = godotenv.Load()
+	_ = os.MkdirAll("logs", 0755)
 
-	logPath := os.Getenv("LOG_FILE_PATH")
-	if logPath == "" {
-		log.Fatal("LOG_FILE_PATH not set in .env")
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("No .env file found or error loading it.")
 	}
 
 	inputFile := os.Getenv("EMAIL_INPUT_FILE")
-	var input string
-
-	if inputFile != "" {
-		content, err := os.ReadFile(inputFile)
-		if err != nil {
-			log.Fatalf("failed to read input file: %v", err)
-		}
-		input = string(content)
-	} else {
-		fmt.Println("Reading email from stdin (end with Ctrl+D):")
-		stdinBytes, err := io.ReadAll(os.Stdin)
-		if err != nil {
-			log.Fatalf("failed to read from stdin: %v", err)
-		}
-		input = string(stdinBytes)
+	logFilePath := os.Getenv("LOG_FILE_PATH")
+	if logFilePath == "" {
+		logFilePath = "logs/parser.log"
 	}
 
-	email := parseEmail(input)
+	logFile, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatalf("Could not open log file: %v", err)
+	}
+	defer logFile.Close()
+	log.SetOutput(logFile)
+
+	var rawInput string
+	if inputFile != "" {
+		data, err := os.ReadFile(inputFile)
+		if err != nil {
+			log.Fatalf("Failed to read input file: %v", err)
+		}
+		rawInput = string(data)
+	} else {
+		data, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			log.Fatalf("Failed to read from stdin: %v", err)
+		}
+		rawInput = string(data)
+	}
+
+	email := parseEmail(rawInput)
 	entry := LogEntry{
-		Timestamp: time.Now().Format("2006-01-02 15:04:05 MST"),
+		Timestamp: time.Now().Format(time.RFC3339),
 		Service:   "parser",
 		Event:     "parsed_email",
 		Data:      email,
 	}
-	writeLog(entry, logPath)
-	fmt.Println("Email parsed and logged.")
+
+	jsonData, err := json.MarshalIndent(entry, "", "  ")
+	if err != nil {
+		log.Fatalf("Failed to encode JSON: %v", err)
+	}
+
+	log.Println(string(jsonData))
+	fmt.Println(string(jsonData))
 }
