@@ -1,6 +1,18 @@
 #!/bin/bash
 set -e
 
+echo "📁 Verifying you are in the correct project root directory..."
+
+EXPECTED_ITEMS=("parser" "webhook" "webhook-server" "Makefile" "etc" "setup.sh")
+
+for item in "${EXPECTED_ITEMS[@]}"; do
+  if [ ! -e "$item" ]; then
+    echo "❌ Missing required item: $item"
+    echo "➡️  Please run this script from the root of the SMTPHook project directory."
+    exit 1
+  fi
+done
+
 echo "🔍 Detecting package manager..."
 if command -v apt-get &>/dev/null; then
   PM="apt"
@@ -30,9 +42,15 @@ case $PM in
     ;;
 esac
 
-echo "🧰 Ensuring podman-compose is installed via pipx..."
+echo "🧰 Installing podman-compose with pipx..."
 pipx install --force podman-compose
 export PATH="$HOME/.local/bin:$PATH"
+
+echo "🧹 Running go mod tidy for all services..."
+for dir in parser webhook webhook-server; do
+  echo "→ Tidying $dir"
+  (cd "$dir" && go mod tidy)
+done
 
 echo "📁 Creating logs/ directory..."
 mkdir -p logs
