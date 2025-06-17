@@ -1,0 +1,7 @@
+[Unit]
+Description=SMTPHook Service Stack
+Requires=parser.service webhook-server.service
+After=network.target
+
+[Install]
+WantedBy=multi-user.target
