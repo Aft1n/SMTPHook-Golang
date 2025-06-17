@@ -1,8 +1,22 @@
 FROM golang:1.21-alpine
 
 WORKDIR /app
+
+# Optimize build cache
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source
 COPY . .
 
-RUN go build -o webhook main.go
+# Build binary
+RUN go build -o main
 
-CMD ["./webhook"]
+# Optional default env (can be overridden by `.env`)
+ENV PORT=4000
+ENV LOG_FILE_PATH=logs/output.log
+
+# Create logs dir
+RUN mkdir -p /app/logs
+
+CMD ["./main"]
