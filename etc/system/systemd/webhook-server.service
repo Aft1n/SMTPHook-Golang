@@ -1,13 +1,16 @@
 [Unit]
 Description=SMTPHook Webhook Receiver
 After=network.target
+Requires=smtphook.target
 
 [Service]
 Type=simple
-ExecStart=/opt/smtphook/bin/webhook-server
+User=smtphook
 WorkingDirectory=/opt/smtphook/webhook-server
-Restart=always
 EnvironmentFile=/opt/smtphook/webhook-server/.env
+ExecStart=/opt/smtphook/bin/webhook-server
+Restart=always
+RestartSec=5s
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=smtphook.target
