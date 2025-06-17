@@ -30,15 +30,16 @@ echo "📦 Installing dependencies with $PM..."
 case $PM in
   apt)
     sudo apt update
-    sudo apt install -y golang git make podman pipx logrotate
+    sudo apt install -y golang git make podman pipx logrotate swaks
     ;;
   dnf)
-    sudo dnf install -y golang git make podman python3-pip pipx logrotate
+    sudo dnf install -y golang git make podman python3-pip pipx logrotate swaks
     ;;
   apk)
     sudo apk add go git make podman py3-pip logrotate
     python3 -m ensurepip
     pip3 install pipx
+    echo "⚠️  Please install swaks manually on Alpine (not in default repos)."
     ;;
 esac
 
@@ -93,3 +94,5 @@ echo "🌀 Installing logrotate config..."
 sudo cp etc/logrotate.d/smtphook /etc/logrotate.d/
 
 echo "✅ Setup complete. SMTPHook is running!"
+echo "📤 You can now test mail input with:"
+echo "    swaks --to test@example.com --server localhost:1025 --data email.txt"
