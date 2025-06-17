@@ -4,76 +4,114 @@ set -e
 echo "🔎 Running SMTPHook diagnostic..."
 echo
 
+# Colors
+GREEN="\e[32m"
+RED="\e[31m"
+NC="\e[0m"
+
+# Check binaries
 echo "🧩 Checking binaries..."
-for bin in parser webhook webhook-server; do
+BINARIES=("parser" "webhook" "webhook-server")
+for bin in "${BINARIES[@]}"; do
   if [ -f "/opt/smtphook/bin/$bin" ]; then
-    echo "✔️  /opt/smtphook/bin/$bin exists"
+    echo -e "✔️  /opt/smtphook/bin/$bin exists"
   else
-    echo "❌ /opt/smtphook/bin/$bin missing"
+    echo -e "${RED}❌ /opt/smtphook/bin/$bin missing${NC}"
   fi
 done
-
 echo
+
+# Check service directories and envs
 echo "📁 Checking working directories and .env files..."
-for dir in parser webhook webhook-server; do
-  if [ -d "/opt/smtphook/$dir" ]; then
-    echo "✔️  /opt/smtphook/$dir exists"
-    if [ -f "/opt/smtphook/$dir/.env" ]; then
+for dir in "${BINARIES[@]}"; do
+  path="/opt/smtphook/$dir"
+  if [ -d "$path" ]; then
+    echo -e "✔️  $path exists"
+    if [ -f "$path/.env" ]; then
       echo "   └── .env found"
     else
-      echo "   ❌ .env missing"
+      echo -e "   └── ${RED}.env missing${NC}"
     fi
   else
-    echo "❌ /opt/smtphook/$dir missing"
+    echo -e "${RED}❌ $path missing${NC}"
   fi
 done
-
 echo
+
+# Check systemd service status
 echo "🧠 Checking systemd service status..."
-for service in parser webhook webhook-server; do
+all_services_ok=true
+
+for service in "${BINARIES[@]}"; do
   echo
   echo "🔸 ${service}.service:"
-  if systemctl list-unit-files | grep -q "^${service}.service"; then
-    if systemctl is-active --quiet "$service"; then
-      systemctl status "$service" --no-pager -n 1 | sed 's/^/   /'
+  if systemctl status "$service.service" &>/dev/null; then
+    status=$(systemctl is-active "$service.service")
+    if [ "$status" = "active" ]; then
+      echo -e "✔️  ${GREEN}Active${NC}"
     else
-      echo "   ❌ Service exists but failed to start"
-      systemctl status "$service" --no-pager -n 3 | sed 's/^/   /'
+      echo -e "${RED}❌ Service exists but failed to start${NC}"
+      systemctl status "$service.service" --no-pager -n 5 | sed 's/^/   /'
+      all_services_ok=false
     fi
   else
-    echo "   ❌ ${service}.service not found in systemd"
+    echo -e "${RED}❌ ${service}.service not found in systemd${NC}"
+    all_services_ok=false
   fi
 done
-
 echo
+
+# Check logs dir
 echo "📄 Checking log directory..."
-if [ -d logs ]; then
-  echo "✔️  logs exists"
+if [ ! -d "logs" ]; then
+  echo -e "${RED}❌ logs/ missing. Creating now...${NC}"
+  mkdir -p logs
 else
-  echo "❌ logs directory missing"
+  echo -e "✔️  logs exists"
 fi
-
 echo
+
+# Check open ports
 echo "📡 Checking open ports..."
-ss -tuln | grep -E ':1025|:8025|:4000|:4001' || echo "❌ No expected ports open"
-
+ss -tuln | grep -E ':1025|:4000|:4001|:8025' || echo "⚠️  No known ports currently listening"
 echo
+
+# Check for conflicting ports in .env files
 echo "🧪 Checking for PORT conflicts in .env files..."
-for dir in parser webhook webhook-server; do
-  if [ -f "$dir/.env" ]; then
-    echo "→ $dir/.env: $(grep PORT= "$dir/.env" || echo 'PORT not defined')"
+declare -A seen_ports
+conflict=false
+for dir in "${BINARIES[@]}"; do
+  env_file="/opt/smtphook/$dir/.env"
+  if [ -f "$env_file" ]; then
+    port=$(grep '^PORT=' "$env_file" | cut -d '=' -f2)
+    if [ -n "$port" ]; then
+      if [[ -n "${seen_ports[$port]}" ]]; then
+        echo -e "${RED}❌ Port $port used in both ${seen_ports[$port]} and $dir${NC}"
+        conflict=true
+      else
+        seen_ports[$port]=$dir
+        echo "✔️  $dir uses port $port"
+      fi
+    fi
   fi
 done
-
 echo
+
+# Tail logs if available
 echo "🧾 Tailing logs (if present)..."
-for service in parser webhook webhook-server; do
-  logfile="logs/${service}.log"
-  if [ -f "$logfile" ]; then
-    echo "→ Last log lines from $logfile:"
-    tail -n 3 "$logfile"
+for file in logs/*.log; do
+  if [ -f "$file" ]; then
+    echo "📜 Last 3 lines of $file:"
+    tail -n 3 "$file"
+    echo
   fi
 done
 
-echo
-echo "✅ Diagnostic complete."
+# Final summary
+echo -e "✅ Diagnostic complete."
+
+if [ "$all_services_ok" = false ] || [ "$conflict" = true ]; then
+  echo -e "${RED}⚠️  One or more issues were detected above.${NC}"
+else
+  echo -e "${GREEN}🚀 All services running and healthy!${NC}"
+fi
