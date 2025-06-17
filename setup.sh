@@ -1,98 +1,81 @@
 #!/bin/bash
+
 set -e
 
-echo "📁 Verifying you are in the correct project root directory..."
-
-EXPECTED_ITEMS=("parser" "webhook" "webhook-server" "Makefile" "etc" "setup.sh")
-
-for item in "${EXPECTED_ITEMS[@]}"; do
-  if [ ! -e "$item" ]; then
-    echo "❌ Missing required item: $item"
-    echo "➡️  Please run this script from the root of the SMTPHook project directory."
-    exit 1
-  fi
-done
-
-echo "🔍 Detecting package manager..."
-if command -v apt-get &>/dev/null; then
-  PM="apt"
-elif command -v dnf &>/dev/null; then
-  PM="dnf"
-elif command -v apk &>/dev/null; then
-  PM="apk"
-else
-  echo "❌ Unsupported package manager. Please install dependencies manually."
+# Check we're in the right folder
+if [ ! -f "setup.sh" ] || [ ! -d "parser" ]; then
+  echo "❌ Run this script from the root of the SMTPHook-Golang repository"
   exit 1
 fi
 
-echo "📦 Installing dependencies with $PM..."
+echo "🔍 Detecting package manager..."
 
-case $PM in
-  apt)
-    sudo apt update
-    sudo apt install -y golang git make podman pipx logrotate swaks
-    ;;
-  dnf)
-    sudo dnf install -y golang git make podman python3-pip pipx logrotate swaks
-    ;;
-  apk)
-    sudo apk add go git make podman py3-pip logrotate
-    python3 -m ensurepip
-    pip3 install pipx
-    echo "⚠️  Please install swaks manually on Alpine (not in default repos)."
-    ;;
-esac
+if command -v apt &>/dev/null; then
+  PM="apt"
+  INSTALL="sudo apt update && sudo apt install -y"
+elif command -v dnf &>/dev/null; then
+  PM="dnf"
+  INSTALL="sudo dnf install -y"
+elif command -v apk &>/dev/null; then
+  PM="apk"
+  INSTALL="sudo apk add"
+else
+  echo "❌ Supported package manager not found (apt, dnf, apk)"
+  exit 1
+fi
 
-echo "🧰 Installing podman-compose with pipx..."
-pipx install --force podman-compose
-export PATH="$HOME/.local/bin:$PATH"
+echo "✅ Package manager detected: $PM"
 
-echo "🧹 Running go mod tidy for all services..."
-for dir in parser webhook webhook-server; do
-  echo "→ Tidying $dir"
-  (cd "$dir" && go mod tidy)
-done
+echo "📦 Installing dependencies..."
+$INSTALL golang git make curl pipx swaks
+
+echo "🧰 Installing podman and podman-compose..."
+$INSTALL podman
+
+# Ensure pipx is available
+python3 -m ensurepip --upgrade || true
+pipx ensurepath
+pipx install podman-compose || true
 
 echo "📁 Creating logs/ directory..."
 mkdir -p logs
 
 echo "🔧 Copying .env.example files..."
 for dir in parser webhook webhook-server; do
-  if [ ! -f "$dir/.env" ] && [ -f "$dir/.env.example" ]; then
+  if [ -f "$dir/.env.example" ] && [ ! -f "$dir/.env" ]; then
     cp "$dir/.env.example" "$dir/.env"
     echo "✔️  $dir/.env created"
   fi
+done
+
+echo "🧹 Running go mod tidy for all services..."
+for dir in parser webhook webhook-server; do
+  echo "→ Tidying $dir"
+  (cd $dir && go mod tidy)
 done
 
 echo "🔨 Building services with Make..."
 make
 
 echo "📦 Installing binaries to /opt/smtphook/bin..."
-sudo mkdir -p /opt/smtphook/bin
-sudo cp bin/* /opt/smtphook/bin
-
-echo "📁 Preparing /opt/smtphook service directories..."
-for dir in parser webhook webhook-server; do
-  sudo mkdir -p "/opt/smtphook/$dir"
-  if [ -f "$dir/.env" ]; then
-    sudo cp "$dir/.env" "/opt/smtphook/$dir/.env"
-    echo "✔️  /opt/smtphook/$dir/.env deployed"
-  fi
-done
+sudo make install
 
 echo "🛠 Installing systemd service units..."
 sudo cp etc/system/systemd/*.service /etc/systemd/system/
 sudo cp etc/system/systemd/smtphook.target /etc/systemd/system/
 sudo systemctl daemon-reexec
 sudo systemctl daemon-reload
+sudo systemctl enable smtphook.target || true
+sudo systemctl start smtphook.target || true
 
-echo "🔌 Enabling and starting services..."
-sudo systemctl enable smtphook.target
-sudo systemctl start smtphook.target
+echo "🧪 Creating sample email.txt for testing..."
+cat > email.txt <<EOF
+From: test@example.com
+To: demo@example.com
+Subject: Test Email
 
-echo "🌀 Installing logrotate config..."
-sudo cp etc/logrotate.d/smtphook /etc/logrotate.d/
+This is a test message body.
+EOF
+echo "✔️  email.txt created"
 
-echo "✅ Setup complete. SMTPHook is running!"
-echo "📤 You can now test mail input with:"
-echo "    swaks --to test@example.com --server localhost:1025 --data email.txt"
+echo "✅ Setup complete!"
