@@ -26,7 +26,6 @@ else
 fi
 
 echo "📦 Installing dependencies with $PM..."
-
 case $PM in
   apt)
     sudo apt update
@@ -64,6 +63,17 @@ for dir in parser webhook webhook-server; do
   fi
 done
 
+echo "📄 Creating sample email.txt for testing..."
+cat <<EOF > email.txt
+Date: $(date -R)
+To: test@example.com
+From: void@Nexus
+Subject: test $(date -R)
+
+This is a test mailing
+EOF
+echo "✔️  email.txt created"
+
 echo "🔨 Building services with Make..."
 make
 
@@ -86,34 +96,16 @@ sudo cp etc/system/systemd/smtphook.target /etc/systemd/system/
 sudo systemctl daemon-reexec
 sudo systemctl daemon-reload
 
-# Ensure webhook.service is enabled
-if [ -f /etc/systemd/system/webhook.service ]; then
-  echo "✔️  webhook.service installed"
-else
-  echo "❌ Missing webhook.service file in etc/system/systemd/"
-fi
-
 echo "🔌 Enabling and starting services..."
+sudo systemctl enable parser.service
+sudo systemctl enable webhook.service
+sudo systemctl enable webhook-server.service
 sudo systemctl enable smtphook.target
 sudo systemctl start smtphook.target
 
 echo "🌀 Installing logrotate config..."
 sudo cp etc/logrotate.d/smtphook /etc/logrotate.d/
 
-echo "🧪 Creating sample email.txt for testing..."
-if [ ! -f email.txt ]; then
-cat <<EOF > email.txt
-From: sender@example.com
-To: test@example.com
-Subject: Test Email
-
-This is a test message sent via swaks.
-EOF
-  echo "✔️  email.txt created"
-else
-  echo "ℹ️  email.txt already exists"
-fi
-
 echo "✅ Setup complete. SMTPHook is running!"
-echo "📤 You can now test mail input with:"
-echo "swaks --to test@example.com --server localhost:1025 < email.txt"
+echo "📤 Test email with:"
+echo "    swaks --to test@example.com --server localhost:1025 < email.txt"
