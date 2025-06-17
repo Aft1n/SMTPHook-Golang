@@ -1,9 +1,0 @@
-/home/void/code/SMTPHook-golang/logs/*.log {
-    daily
-    missingok
-    rotate 7
-    compress
-    delaycompress
-    notifempty
-    copytruncate
-}
