@@ -231,3 +231,67 @@ tail -f logs/webhook.log
 - Build individual services locally with `go build -o bin/<name>` inside each subdirectory.
 - Use `log.Println()` for temporary debug logging.
 - Implement `/health` endpoint in each service for integration with health checks.
+
+
+
+---
+
+## 🔧 How to Configure SMTPHook for Your API
+
+You can configure SMTPHook to forward parsed emails to **your own API endpoint** instead of the default internal webhook.
+
+### Step 1: Edit `.env` for `parser`
+
+In `parser/.env`:
+
+```env
+# Replace with your real API endpoint
+WEBHOOK_URL=https://your-api.com/inbound-email
+```
+
+Make sure your API accepts `POST` requests with the following JSON structure:
+
+```json
+{
+  "from": "sender@example.com",
+  "to": ["your@domain.com"],
+  "subject": "Sample Subject",
+  "body": "Message body here",
+  "timestamp": "ISO 8601 string"
+}
+```
+
+### Step 2: Rebuild and Restart
+
+If using containers:
+
+```bash
+podman-compose down
+podman-compose up --build
+```
+
+If using systemd:
+
+```bash
+sudo systemctl restart smtphook.target
+```
+
+### Step 3: Verify Delivery
+
+You should see POST requests from the `parser` service hitting your API. Check logs with:
+
+```bash
+tail -f logs/parser.log
+```
+
+### 🔐 Tips
+
+- Make sure your API allows CORS and HTTPS if needed.
+- Use authentication tokens in headers if your API requires it. Extend `parser` to support headers via `.env`.
+
+Example:
+```env
+WEBHOOK_AUTH_HEADER=Authorization: Bearer YOUR_TOKEN
+```
+
+And modify `parser/main.go` to read and attach this header if defined.
