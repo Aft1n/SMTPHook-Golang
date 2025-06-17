@@ -88,16 +88,40 @@ curl http://localhost:4000/health
 ## 🧰 Folder Structure
 
 ```
-SMTPHook-Golang/
-├── parser/            # Polls, parses and sends email JSON
-├── webhook/           # Test webhook server
-├── webhook-server/    # Production webhook consumer
-├── etc/quadlet/       # Quadlet container definitions
-├── logs/              # Log output
-├── email.txt          # Sample test message
-├── sample-email.json  # Webhook sample payload
-├── setup.sh           # Main install script
-└── ...
+SMTPHook-Golang-main/
+├── Makefile                     # Build automation script for Go services
+├── README.md                    # Project documentation (this file)
+├── diagnose.sh                  # Diagnostic script to check services, logs, ports
+├── etc/                         # System configuration files
+│   └── quadlet/                 # Quadlet container definitions for systemd + Podman
+│       ├── container-parser.container
+│       ├── container-smtp.container
+│       ├── container-webhook-server.container
+│       ├── container-webhook.container
+│       └── smtphook.net         # Podman network definition
+├── mailpit/                     # Optional Mailpit Dockerfile if custom build is needed
+│   └── Dockerfile
+├── parser/                      # Email parser service
+│   ├── .env.example             # Example environment config
+│   ├── Dockerfile               # Container build file
+│   ├── go.mod                   # Go module file
+│   └── main.go                  # Main logic to parse email and forward as JSON
+├── podman-compose.yml           # Podman-compatible Docker Compose file for dev/test
+├── reset.sh                     # Cleanup script: removes all containers and files
+├── run.sh                       # Manual launcher (non-systemd)
+├── sample-email.json            # Example of parsed email JSON payload
+├── setup.sh                     # Full automatic installer and builder
+├── uninstall.sh                 # Full uninstaller for the app
+├── webhook-server/              # Production-grade webhook receiver with retry logic and action hooks
+│   ├── .env.example             # Environment file to configure listening port and logging paths
+│   ├── Dockerfile               # Container setup for deployment in Podman or Docker
+│   ├── go.mod                   # Module definition including required libraries
+│   └── main.go                  # Accepts parsed emails, logs them, performs configured actions (e.g. alerting)
+├── webhook/                     # Lightweight development-only webhook that logs parsed emails
+│   ├── .env.example             # Environment variables for port config, logging, etc.
+│   ├── Dockerfile               # Container definition to run the test webhook in isolation
+│   ├── go.mod                   # Go module definition for dependencies
+│   └── main.go                  # Receives POST requests from parser, logs output to console
 ```
 
 ---
