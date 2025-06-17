@@ -19,6 +19,15 @@ services:
     networks:
       - smtphook
 
+  webhook-server:
+    build:
+      context: ./webhook-server
+    container_name: webhook-server
+    ports:
+      - "4001:4001"
+    networks:
+      - smtphook
+
   parser:
     build:
       context: ./parser
@@ -26,6 +35,7 @@ services:
     depends_on:
       - smtp
       - webhook
+      - webhook-server
     networks:
       - smtphook
 
