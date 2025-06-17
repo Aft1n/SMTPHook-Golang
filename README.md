@@ -81,7 +81,7 @@ To remove everything, including systemd units, logs, and binaries:
 ### Send test email into Mailpit:
 
 ```bash
-swaks --to test@example.com --server localhost:1025 --data email.txt
+swaks --to test@example.com --server localhost:1025 < email.txt
 ```
 
 ### Manually test webhook:
