@@ -1,78 +1,75 @@
 #!/bin/bash
 set -e
 
-echo "🔎 Running SMTPHook container diagnostic..."
+echo "🔎 Running SMTPHook diagnostic..."
+echo ""
 
-REQUIRED_CONTAINERS=("smtp" "webhook" "webhook-server" "parser")
-REQUIRED_PORTS=("1025" "8025" "4000" "5000")
-
-echo
-echo "📦 Verifying required containers are running..."
-for container in "${REQUIRED_CONTAINERS[@]}"; do
-  if podman ps --format "{{.Names}}" | grep -q "^${container}$"; then
-    echo "✔️  $container is running"
+# Check binaries
+echo "🧩 Checking binaries..."
+for bin in parser webhook webhook-server; do
+  if [ -x "/opt/smtphook/bin/$bin" ]; then
+    echo "✔️  /opt/smtphook/bin/$bin exists"
   else
-    echo "❌ $container is NOT running"
+    echo "❌ /opt/smtphook/bin/$bin missing"
   fi
 done
+echo ""
 
-echo
-echo "📁 Checking service directories and .env files..."
+# Check .env files
+echo "📁 Checking working directories and .env files..."
 for dir in parser webhook webhook-server; do
-  if [ -d "$dir" ]; then
-    echo "✔️  $dir exists"
-    if [ -f "$dir/.env" ]; then
+  if [ -d "/opt/smtphook/$dir" ]; then
+    echo "✔️  /opt/smtphook/$dir exists"
+    if [ -f "/opt/smtphook/$dir/.env" ]; then
       echo "   └── .env found"
     else
-      echo "   ❌ .env missing in $dir"
+      echo "   └── ❌ .env missing"
     fi
   else
-    echo "❌ $dir directory missing"
+    echo "❌ /opt/smtphook/$dir missing"
   fi
 done
+echo ""
 
-echo
-echo "📄 Checking logs/ directory..."
+# Check Quadlet systemd units
+echo "🧠 Checking Quadlet container status..."
+
+for name in smtp webhook webhook-server parser; do
+  service="container-${name}.service"
+  status=$(systemctl --user is-active "$service" 2>/dev/null || echo "not found")
+  if [ "$status" == "active" ]; then
+    echo "✔️  $service is active"
+  else
+    echo "❌ $service is not active"
+  fi
+done
+echo ""
+
+# Check ports
+echo "📡 Checking open ports..."
+ss -tuln | grep -E ':1025|:4000|:4001|:8025' || echo "⚠️  No expected ports open"
+echo ""
+
+# Check log dir
+echo "📄 Checking log directory..."
 if [ -d logs ]; then
   echo "✔️  logs exists"
 else
-  echo "❌ logs directory not found"
+  echo "❌ logs directory missing"
 fi
+echo ""
 
-echo
-echo "📡 Checking open ports..."
-ss -tuln | grep -E ':1025|:8025|:4000|:5000' || echo "❌ No expected ports are open"
-
-echo
-echo "📑 Checking port assignments in .env files..."
-check_port() {
-  file="$1/.env"
-  expected="$2"
+# Check logs
+echo "🧾 Tailing logs (if present)..."
+for name in parser webhook webhook-server; do
+  file="logs/${name}.log"
   if [ -f "$file" ]; then
-    port=$(grep -E '^PORT=' "$file" | cut -d= -f2)
-    if [ "$port" == "$expected" ]; then
-      echo "✔️  $1 uses expected port $expected"
-    else
-      echo "⚠️  $1 has unexpected port $port (expected $expected)"
-    fi
+    echo "▶️  Last lines of $file:"
+    tail -n 5 "$file"
   else
     echo "⚠️  $file not found"
   fi
-}
-
-check_port webhook 4000
-check_port webhook-server 5000
-
-echo
-echo "🧾 Tailing container logs (if present)..."
-for container in "${REQUIRED_CONTAINERS[@]}"; do
-  echo "🔹 Logs for $container:"
-  if podman ps -a --format "{{.Names}}" | grep -q "^$container$"; then
-    podman logs --tail 10 "$container" || echo "⚠️  Failed to read logs for $container"
-  else
-    echo "⚠️  Container $container not found"
-  fi
-  echo
 done
 
+echo ""
 echo "✅ Diagnostic complete."
