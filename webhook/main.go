@@ -19,18 +19,8 @@ func main() {
 		port = "4000"
 	}
 
-	logPath := os.Getenv("LOG_FILE_PATH")
-	if logPath == "" {
-		logPath = "logs/webhook.log"
-	}
-
-	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	if err != nil {
-		log.Fatalf("Error opening log file: %v", err)
-	}
-	defer logFile.Close()
-	log.SetOutput(logFile)
-
+	// Log to stdout (default)
+	log.SetOutput(os.Stdout)
 	log.Println("Webhook service starting on port", port)
 
 	http.HandleFunc("/email", func(w http.ResponseWriter, r *http.Request) {
