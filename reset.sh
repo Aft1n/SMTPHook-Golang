@@ -1,52 +1,36 @@
 #!/bin/bash
 set -e
 
-PURGE_MODE=false
+echo "🧨 Stopping and removing all SMTPHook-related containers and images..."
 
-if [[ "$1" == "--purge" ]]; then
-  PURGE_MODE=true
-fi
+SERVICES=("parser" "webhook" "webhook-server" "smtp")
 
-echo "🛑 Stopping running services (if any)..."
-sudo systemctl stop smtphook.target 2>/dev/null || true
-sudo systemctl stop parser.service 2>/dev/null || true
-sudo systemctl stop webhook.service 2>/dev/null || true
-sudo systemctl stop webhook-server.service 2>/dev/null || true
+# Stop and remove containers
+for service in "${SERVICES[@]}"; do
+  echo "⛔️ Stopping $service container (if running)..."
+  podman stop "$service" 2>/dev/null || true
+  podman rm "$service" 2>/dev/null || true
 
-echo "🧹 Cleaning build artifacts..."
-rm -rf bin/
-for dir in parser webhook webhook-server; do
-  rm -f "$dir/.env"
-  rm -f "$dir"/"$dir"       # any accidentally generated binary
+  echo "🧹 Removing image for $service (if present)..."
+  podman rmi "localhost/smtphook-golang_$service" 2>/dev/null || true
+
+  echo "🧼 Cleaning up Quadlet container unit..."
+  CONTAINER_UNIT="$HOME/.config/containers/systemd/container-${service}.container"
+  if [ -f "$CONTAINER_UNIT" ]; then
+    systemctl --user disable --now "container-${service}.service" 2>/dev/null || true
+    rm -f "$CONTAINER_UNIT"
+    echo "✔️ Removed $CONTAINER_UNIT"
+  fi
 done
 
-echo "📁 Cleaning logs/..."
-rm -rf logs/
+echo "📂 Cleaning container systemd folder..."
+rm -rf "$HOME/.config/containers/systemd"
 
-if $PURGE_MODE; then
-  echo "🔥 PURGE mode: Removing installed system files..."
+echo "🧽 Removing /opt/smtphook installation..."
+sudo rm -rf /opt/smtphook
 
-  echo "🗑 Disabling and removing systemd unit files..."
-  sudo systemctl disable smtphook.target parser.service webhook.service webhook-server.service 2>/dev/null || true
-  sudo rm -f /etc/systemd/system/parser.service
-  sudo rm -f /etc/systemd/system/webhook.service
-  sudo rm -f /etc/systemd/system/webhook-server.service
-  sudo rm -f /etc/systemd/system/smtphook.target
-  sudo systemctl daemon-reload
+echo "🧹 Cleaning up build output..."
+rm -rf bin logs email.txt
 
-  echo "🗑 Removing installed binaries and service folders..."
-  sudo rm -rf /opt/smtphook/bin
-  sudo rm -rf /opt/smtphook/parser
-  sudo rm -rf /opt/smtphook/webhook
-  sudo rm -rf /opt/smtphook/webhook-server
-
-  echo "🧻 Removing logrotate config..."
-  sudo rm -f /etc/logrotate.d/smtphook
-fi
-
-echo "✅ Reset complete."
-if $PURGE_MODE; then
-  echo "📦 All persistent files have been purged."
-else
-  echo "🔁 Project is clean. You can now rerun ./setup.sh."
-fi
+echo "📄 Reset complete. All containers and services have been removed."
+echo "🔁 You can now re-run ./setup.sh to start fresh."
