@@ -11,7 +11,6 @@ import (
 )
 
 func main() {
-	// Load environment variables
 	_ = godotenv.Load()
 
 	port := os.Getenv("PORT")
@@ -19,11 +18,11 @@ func main() {
 		port = "4000"
 	}
 
-	// Log to stdout (default)
 	log.SetOutput(os.Stdout)
 	log.Println("Webhook service starting on port", port)
 
-	http.HandleFunc("/email", func(w http.ResponseWriter, r *http.Request) {
+	// Handler for any of these routes
+	handler := func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Only POST supported", http.StatusMethodNotAllowed)
 			return
@@ -37,11 +36,18 @@ func main() {
 		}
 		defer r.Body.Close()
 
-		log.Printf("[%s] Received email payload:\n%s\n", time.Now().Format(time.RFC3339), string(body))
+		log.Printf("[%s] Received webhook on %s:\n%s\n", time.Now().Format(time.RFC3339), r.URL.Path, string(body))
 		w.WriteHeader(http.StatusOK)
-	})
+	}
 
-	// Health check endpoint
+	// Register all desired routes
+	http.HandleFunc("/", handler)
+	http.HandleFunc("/webhook", handler)
+	http.HandleFunc("/event", handler)
+	http.HandleFunc("/receive", handler)
+	http.HandleFunc("/email", handler)
+
+	// Health check
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
