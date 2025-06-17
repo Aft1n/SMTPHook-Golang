@@ -1,0 +1,12 @@
+[Unit]
+Description=SMTPHook Mailpit
+
+[Container]
+Image=axllent/mailpit:latest
+Name=smtp
+PublishPort=1025:1025
+PublishPort=8025:8025
+Volume=%h/code/SMTPHook-Golang/logs:/data
+
+[Install]
+WantedBy=default.target
