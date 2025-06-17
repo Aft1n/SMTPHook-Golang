@@ -1,15 +1,13 @@
 [Unit]
-Description=SMTPHook Parser Service
+Description=SMTPHook Parser
 After=network.target
 
 [Service]
-ExecStart=/usr/local/bin/parser
+Type=simple
+ExecStart=/opt/smtphook/bin/parser
 WorkingDirectory=/opt/smtphook/parser
-StandardOutput=file:/opt/smtphook/logs/parser.log
-StandardError=file:/opt/smtphook/logs/parser.log
 Restart=always
-User=nobody
-EnvironmentFile=/opt/smtphook/.env
+EnvironmentFile=/opt/smtphook/parser/.env
 
 [Install]
 WantedBy=multi-user.target
