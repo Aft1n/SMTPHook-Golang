@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "📁 Verifying you're in the SMTPHook project root..."
+echo "📁 Verifying you are in the correct project root directory..."
 
 EXPECTED_ITEMS=("parser" "webhook" "webhook-server" "Makefile" "etc" "setup.sh")
 
@@ -14,7 +14,6 @@ for item in "${EXPECTED_ITEMS[@]}"; do
 done
 
 echo "🔍 Detecting package manager..."
-
 if command -v apt-get &>/dev/null; then
   PM="apt"
 elif command -v dnf &>/dev/null; then
@@ -70,6 +69,15 @@ make
 echo "📦 Installing binaries to /opt/smtphook/bin..."
 sudo mkdir -p /opt/smtphook/bin
 sudo cp bin/* /opt/smtphook/bin
+
+echo "📁 Preparing /opt/smtphook service directories..."
+for dir in parser webhook webhook-server; do
+  sudo mkdir -p "/opt/smtphook/$dir"
+  if [ -f "$dir/.env" ]; then
+    sudo cp "$dir/.env" "/opt/smtphook/$dir/.env"
+    echo "✔️  /opt/smtphook/$dir/.env deployed"
+  fi
+done
 
 echo "🛠 Installing systemd service units..."
 sudo cp etc/system/systemd/*.service /etc/systemd/system/
