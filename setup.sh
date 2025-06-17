@@ -26,6 +26,7 @@ else
 fi
 
 echo "📦 Installing dependencies with $PM..."
+
 case $PM in
   apt)
     sudo apt update
@@ -54,6 +55,7 @@ done
 
 echo "📁 Creating logs/ directory..."
 mkdir -p logs
+sudo chown "$(whoami)" logs 2>/dev/null || true
 
 echo "🔧 Copying .env.example files..."
 for dir in parser webhook webhook-server; do
@@ -62,16 +64,6 @@ for dir in parser webhook webhook-server; do
     echo "✔️  $dir/.env created"
   fi
 done
-
-echo "📄 Creating sample email.txt for testing..."
-cat > email.txt <<EOF
-Date: $(date)
-To: test@example.com
-From: void@localhost
-Subject: test $(date)
-
-This is a test mailing
-EOF
 
 echo "🔨 Building services with Make..."
 make
@@ -89,11 +81,6 @@ for dir in parser webhook webhook-server; do
   fi
 done
 
-# ✅ NEW: Create /opt/smtphook/logs so all services can write their logs
-echo "📁 Creating /opt/smtphook/logs directory..."
-sudo mkdir -p /opt/smtphook/logs
-sudo chown -R $USER:$USER /opt/smtphook/logs
-
 echo "🛠 Installing systemd service units..."
 sudo cp etc/system/systemd/*.service /etc/systemd/system/
 sudo cp etc/system/systemd/smtphook.target /etc/systemd/system/
@@ -106,6 +93,19 @@ sudo systemctl start smtphook.target
 
 echo "🌀 Installing logrotate config..."
 sudo cp etc/logrotate.d/smtphook /etc/logrotate.d/
+
+echo "🧪 Creating email.txt for swaks testing..."
+cat <<EOF > email.txt
+Date: $(date -R)
+To: test@example.com
+From: voidwatch@Whateversaurus
+Subject: test $(date -R)
+Message-Id: <$(date +%s)@Whateversaurus>
+X-Mailer: swaks
+
+This is a test mailing
+EOF
+echo "✔️  email.txt created"
 
 echo "✅ Setup complete. SMTPHook is running!"
 echo "📤 You can now test mail input with:"
