@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "📁 Verifying you are in the correct project root directory..."
+echo "📁 Verifying you're in the SMTPHook project root..."
 
 EXPECTED_ITEMS=("parser" "webhook" "webhook-server" "Makefile" "etc" "setup.sh")
 
@@ -14,6 +14,7 @@ for item in "${EXPECTED_ITEMS[@]}"; do
 done
 
 echo "🔍 Detecting package manager..."
+
 if command -v apt-get &>/dev/null; then
   PM="apt"
 elif command -v dnf &>/dev/null; then
@@ -63,7 +64,7 @@ for dir in parser webhook webhook-server; do
   fi
 done
 
-echo "🔨 Building services..."
+echo "🔨 Building services with Make..."
 make
 
 echo "📦 Installing binaries to /opt/smtphook/bin..."
