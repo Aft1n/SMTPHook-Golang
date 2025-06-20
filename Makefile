@@ -13,8 +13,8 @@ all: build
 build:
 	@mkdir -p $(BIN_DIR)
 	@for service in $(SERVICES); do \
-		echo "🔨 Building $$service..."; \
-		cd $$service && go build -o ../$(BIN_DIR)/$$service || exit 1; cd ..; \
+		echo "🔄 Preparing $$service..."; \
+		cd $$service && go mod tidy && go get ./... && echo "🔨 Building $$service..." && go build -o ../$(BIN_DIR)/$$service || exit 1; cd ..; \
 	done
 	@echo "✅ All services built successfully."
 
