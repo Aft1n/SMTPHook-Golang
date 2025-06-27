@@ -47,8 +47,11 @@ case $PM in
     ;;
 esac
 
-# Ensure pipx is working
+# Ensure pipx is usable and path is loaded
 pipx ensurepath
+if ! grep -q '.local/bin' ~/.bashrc; then
+  echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+fi
 export PATH="$HOME/.local/bin:$PATH"
 
 # Install podman-compose if missing
@@ -75,10 +78,6 @@ if command -v go &>/dev/null; then
       curl -LO "$GO_URL"
       sudo tar -C /usr/local -xzf "$GO_TARBALL"
       rm "$GO_TARBALL"
-      if ! grep -q '/usr/local/go/bin' ~/.bashrc; then
-        echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-      fi
-      export PATH=$PATH:/usr/local/go/bin
     else
       echo "Setup aborted: Go version too old."
       exit 1
@@ -91,14 +90,20 @@ else
   curl -LO "$GO_URL"
   sudo tar -C /usr/local -xzf "$GO_TARBALL"
   rm "$GO_TARBALL"
-  if ! grep -q '/usr/local/go/bin' ~/.bashrc; then
-    echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-  fi
-  export PATH=$PATH:/usr/local/go/bin
 fi
+
+# Add Go to PATH permanently and immediately
+if ! grep -q '/usr/local/go/bin' ~/.bashrc; then
+  echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
+fi
+export PATH=$PATH:/usr/local/go/bin
+
+# Final check
+echo "Go version: $(go version)"
+echo "podman-compose version: $(podman-compose --version)"
 
 echo "Running make build-prod..."
 make build-prod
 
-echo "Production setup complete. To run the parser container:"
+echo "Production setup complete. You can now run:"
 echo "  podman-compose -f podman-compose-prod.yml up"
