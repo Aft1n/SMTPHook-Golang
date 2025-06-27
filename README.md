@@ -39,7 +39,7 @@ cd SMTPHook-Golang
 ### 2. Run the production setup
 
 ```bash
-chmod +x setup-production.sh start.production.sh run-prod.sh uninstall-prod.sh reset-prod.sh diagnose-prod.sh
+chmod +x setup-production.sh start-production.sh run-prod.sh uninstall-prod.sh reset-prod.sh diagnose-prod.sh
 ./start-production.sh setup
 ```
 
