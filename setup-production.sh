@@ -37,15 +37,27 @@ echo "Installing dependencies with $PM..."
 case $PM in
   apt)
     sudo apt update
-    sudo apt install -y golang git make podman pipx logrotate swaks curl wget
+    sudo apt install -y golang git make podman logrotate swaks curl wget python3-pip pipx
     ;;
   dnf)
-    sudo dnf install -y golang git make podman pipx logrotate swaks curl wget
+    sudo dnf install -y golang git make podman logrotate swaks curl wget python3-pip pipx
     ;;
   apk)
-    sudo apk add go git make podman py3-pip logrotate swaks curl wget
+    sudo apk add go git make podman py3-pip logrotate swaks curl wget pipx
     ;;
 esac
+
+# Ensure pipx is working
+pipx ensurepath
+export PATH="$HOME/.local/bin:$PATH"
+
+# Install podman-compose if missing
+echo "Ensuring podman-compose is installed..."
+if ! command -v podman-compose &>/dev/null; then
+  pipx install podman-compose
+else
+  echo "podman-compose is already installed."
+fi
 
 # Go version check and optional install
 REQUIRED_GO_VERSION="1.21"
@@ -63,13 +75,9 @@ if command -v go &>/dev/null; then
       curl -LO "$GO_URL"
       sudo tar -C /usr/local -xzf "$GO_TARBALL"
       rm "$GO_TARBALL"
-
-      # Add Go to PATH permanently
       if ! grep -q '/usr/local/go/bin' ~/.bashrc; then
         echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
       fi
-
-      # Apply it immediately for this session
       export PATH=$PATH:/usr/local/go/bin
     else
       echo "Setup aborted: Go version too old."
@@ -83,7 +91,6 @@ else
   curl -LO "$GO_URL"
   sudo tar -C /usr/local -xzf "$GO_TARBALL"
   rm "$GO_TARBALL"
-
   if ! grep -q '/usr/local/go/bin' ~/.bashrc; then
     echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
   fi
