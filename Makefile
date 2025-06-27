@@ -13,15 +13,15 @@ all: build
 build:
 	@mkdir -p $(BIN_DIR)
 	@for service in $(SERVICES); do \
-		echo "🔄 Preparing $$service..."; \
-		cd $$service && go mod tidy && go get ./... && echo "🔨 Building $$service..." && go build -o ../$(BIN_DIR)/$$service || exit 1; cd ..; \
+		echo "🔨 Building $$service..."; \
+		cd $$service && go build -o ../$(BIN_DIR)/$$service || exit 1; cd ..; \
 	done
-	@echo "✅ All services built successfully."
+	@echo "All services built successfully."
 
 # Install to system path
 install:
-	@test -d $(BIN_DIR) || { echo "❌ Error: bin directory does not exist. Run 'make build' first."; exit 1; }
-	@echo "📦 Installing binaries to /opt/smtphook/bin..."
+	@test -d $(BIN_DIR) || { echo "Error: bin directory does not exist. Run 'make build' first."; exit 1; }
+	@echo "Installing binaries to /opt/smtphook/bin..."
 	sudo mkdir -p /opt/smtphook/bin
 	sudo cp $(BIN_DIR)/* /opt/smtphook/bin/
 	@echo "✅ Installed to /opt/smtphook/bin"
@@ -29,9 +29,16 @@ install:
 # Remove built binaries
 clean:
 	@rm -rf $(BIN_DIR)
-	@echo "🧹 Cleaned all built binaries."
+	@echo "Cleaned all built binaries."
 
 # Run using podman-compose
 run:
-	@echo "🚀 Starting services with podman-compose..."
+	@echo "Starting services with podman-compose..."
 	podman-compose -f podman-compose.yml up --build
+
+# Build only production-ready services
+build-prod:
+	@mkdir -p $(BIN_DIR)
+	@echo "Building parser for production..."
+	cd parser && go mod tidy && go get ./... && go build -o ../$(BIN_DIR)/parser || exit 1; cd ..
+	@echo "✅ Production binary built: $(BIN_DIR)/parser"

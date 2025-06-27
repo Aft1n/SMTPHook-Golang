@@ -1,0 +1,12 @@
+[Unit]
+Description=SMTPHook Parser Service (Production)
+
+[Container]
+Image=localhost/parser:latest
+Restart=always
+PodmanArgs=--replace
+Volume=%h/smtphook/logs:/logs:Z
+EnvironmentFile=%h/smtphook/parser/.env
+
+[Install]
+WantedBy=default.target

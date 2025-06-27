@@ -1,0 +1,15 @@
+# Development-only
+/mailpit/
+/webhook/
+/webhook-server/
+/logs/*
+!logs/.keep
+
+# Quadlet containers not used in prod
+etc/quadlet/container-*-dev.container
+etc/quadlet/container-mailpit.container
+etc/quadlet/container-webhook.container
+etc/quadlet/container-webhook-server.container
+
+# Generated binaries
+/bin/

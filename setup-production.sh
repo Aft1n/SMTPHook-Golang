@@ -1,16 +1,16 @@
 #!/bin/bash
 set -e
 
-# Prevent running as root
+# 🚫 Prevent running as root
 if [ "$EUID" -eq 0 ]; then
   echo "❌ Do NOT run this script as root or with sudo."
-  echo "➡️  Please run: ./setup.sh"
+  echo "Please run: ./setup-production.sh"
   exit 1
 fi
 
 echo "Verifying you are in the correct project root directory..."
 
-EXPECTED_ITEMS=("parser" "webhook" "webhook-server" "Makefile" "etc" "setup.sh")
+EXPECTED_ITEMS=("parser" "Makefile" "etc" "setup-production.sh")
 
 for item in "${EXPECTED_ITEMS[@]}"; do
   if [ ! -e "$item" ]; then
@@ -47,7 +47,7 @@ case $PM in
     ;;
 esac
 
-# 🧪 Check and install compatible Go version
+# Go version check and optional install
 REQUIRED_GO_VERSION="1.21"
 GO_TARBALL="go1.21.10.linux-amd64.tar.gz"
 GO_URL="https://go.dev/dl/$GO_TARBALL"
@@ -58,7 +58,6 @@ if command -v go &>/dev/null; then
     echo "Your Go version is $CURRENT_GO_VERSION, but $REQUIRED_GO_VERSION or later is required."
     read -p "Do you want to uninstall your old Go version and install $REQUIRED_GO_VERSION? [y/N]: " confirm
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
-      echo "🧹 Removing old Go..."
       sudo apt remove -y golang-go || true
       sudo rm -rf /usr/local/go
       curl -LO "$GO_URL"
@@ -66,7 +65,6 @@ if command -v go &>/dev/null; then
       rm "$GO_TARBALL"
       echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
       export PATH=$PATH:/usr/local/go/bin
-      echo "Go $REQUIRED_GO_VERSION installed."
     else
       echo "❌ Setup aborted: Go version too old."
       exit 1
@@ -81,11 +79,11 @@ else
   rm "$GO_TARBALL"
   echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
   export PATH=$PATH:/usr/local/go/bin
-  echo "Go installed."
 fi
 
-echo "Running make build..."
-make build
+echo "🔧 Running make build-prod..."
+make build-prod
 
-echo "Setup completed successfully."
-echo "To start the stack, run: podman-compose -f podman-compose.yml up"
+echo "✅ Production setup complete."
+echo "Start your container with:"
+echo "   podman-compose -f podman-compose-prod.yml up"

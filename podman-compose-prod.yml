@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  parser:
+    build:
+      context: ./parser
+    container_name: parser
+    restart: unless-stopped
+    env_file:
+      - ./parser/.env
+    volumes:
+      - ./logs:/logs
+    networks:
+      - smtphook
+
+networks:
+  smtphook:

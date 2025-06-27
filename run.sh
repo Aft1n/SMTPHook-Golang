@@ -2,19 +2,19 @@
 
 set -e
 
-echo "📁 Ensuring logs/ exists..."
+echo "Ensuring logs/ exists..."
 mkdir -p logs
 
-echo "🔧 Copying .env files if missing..."
+echo "Copying .env files if missing..."
 for dir in parser webhook webhook-server; do
   if [ ! -f "$dir/.env" ] && [ -f "$dir/.env.example" ]; then
     cp "$dir/.env.example" "$dir/.env"
-    echo "➕ Created $dir/.env from example"
+    echo "Created $dir/.env from example"
   fi
 done
 
-echo "🔨 Building services..."
+echo "Building services..."
 make build
 
-echo "🚀 Launching stack with podman-compose..."
+echo "Launching stack with podman-compose..."
 podman-compose -f podman-compose.yml up --build
