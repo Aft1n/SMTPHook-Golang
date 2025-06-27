@@ -56,13 +56,13 @@ cp webhook-server/.env.example webhook-server/.env
 ### Podman Compose (development)
 
 ```bash
-podman-compose -f podman-compose.yml up --build
+podman-compose -f podman-compose.yml up --build -d
 ```
 
 ### Docker Compose (alternative)
 
 ```bash
-docker-compose -f podman-compose.yml up --build
+docker-compose -f podman-compose.yml up --build -d
 ```
 
 ---

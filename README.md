@@ -95,7 +95,7 @@ MAIL_DIR=/mail/inbox
 podman-compose -f podman-compose-prod.yml up --build -d
 ```
 
-### Option B: Podman + systemd (Quadlet)
+### Option B: Podman + systemd (Quadlet) [NOT WORKING AT THE MOMENT!]
 
 ```bash
 mkdir -p ~/.config/containers/systemd
