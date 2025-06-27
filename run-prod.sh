@@ -12,4 +12,4 @@ if [ ! -f "parser/.env" ] && [ -f "parser/.env.example" ]; then
 fi
 
 echo "Starting production container..."
-podman-compose -f podman-compose-prod.yml up --build
+podman-compose -f podman-compose-prod.yml up --build -d

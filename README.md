@@ -38,12 +38,20 @@ cd SMTPHook-Golang
 
 ### 2. Run the production setup
 
+This installs required tools, validates Go version, and builds the `parser` binary.
+
 ```bash
 chmod +x setup-production.sh start-production.sh run-prod.sh uninstall-prod.sh reset-prod.sh diagnose-prod.sh
 ./start-production.sh setup
+cp parser/.env.production.example parser/.env
 ```
+Edit your parser env with your config, then choose option A or B.
+NOTE: You might need to start a new shell to load the environment variables.
+Try it out with Option A perhaps
+```
+podman-compose -f podman-compose-prod.yml up --build -d
 
-This installs required tools, validates Go version, and builds the `parser` binary.
+```
 
 ---
 
@@ -79,12 +87,12 @@ MAIL_DIR=/mail/inbox
 
 ---
 
-## Running the Parser
+## You can run the Parser in different ways
 
 ### Option A: Podman Compose (production only)
 
 ```bash
-podman-compose -f podman-compose-prod.yml up --build
+podman-compose -f podman-compose-prod.yml up --build -d
 ```
 
 ### Option B: Podman + systemd (Quadlet)
