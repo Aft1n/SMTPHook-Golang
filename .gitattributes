@@ -1,0 +1,10 @@
+diagnose-prod.sh linguist-vendored
+diagnose.sh linguist-vendored
+reset-prod.sh linguist-vendored
+reset.sh linguist-vendored
+run-prod.sh linguist-vendored
+run.sh linguist-vendored
+setup-production.sh linguist-vendored
+setup.sh linguist-vendored
+uninstall-prod.sh linguist-vendored
+uninstall.sh linguist-vendored
