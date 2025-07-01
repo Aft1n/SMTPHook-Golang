@@ -6,162 +6,132 @@ If you find this project useful, consider buying me a coffee:
 
 [![Donate](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Donate-yellow)](https://coff.ee/voidwatch)
 
-
 # SMTPHook
 
-SMTPHook is a modular, self-hosted email processing pipeline written in Go. It listens for SMTP messages (or parses local mail files), extracts metadata and content, and sends structured JSON to an HTTP webhook.
+SMTPHook is a self-hosted email parsing pipeline written in Go. It converts emails into structured JSON and forwards them to an HTTP webhook.
 
-This README reflects the **production setup**, focused entirely on the `parser` service. Development/testing components are excluded.
+This repository supports two separate modes:
 
----
-
-## Features
-
-- Written in Go (1.21+)
-- Production-only setup with a single service (`parser`)
-- Podman + Quadlet support
-- .env-based configuration
-- Converts email input to JSON webhook calls
-- One-command setup and reset scripts
-- Compatible with PagerDuty, Opsgenie, Prometheus Alertmanager, and more
+1. **Parser-only production setup** (recommended)
+2. **Full development environment** (includes webhook receiver and test SMTP)
 
 ---
 
-## Getting Started
+## 1. Production Setup (Parser-Only)
 
-### 1. Clone the repository
+If you're only interested in receiving and forwarding parsed email, use the `setup-parser.sh` script. This is the **simplest, containerized production setup**.
 
-```bash
-git clone https://github.com/your-org/SMTPHook-Golang.git
-cd SMTPHook-Golang
-```
+### Requirements:
+- Linux with root access (Debian, Ubuntu, Fedora, Arch, etc.)
+- Podman (Docker alternative)
+- `pipx` to install `podman-compose`
 
-### 2. Run the production setup
-
-This installs required tools, validates Go version, and builds the `parser` binary.
+### Steps:
 
 ```bash
-chmod +x setup-production.sh start-production.sh run-prod.sh uninstall-prod.sh reset-prod.sh diagnose-prod.sh
-./start-production.sh setup
-cp parser/.env.production.example parser/.env
-```
-Edit your parser env with your config, then choose option A or B.
-NOTE: You might need to start a new shell to load the environment variables.
-Try it out with Option A perhaps
-```
-podman-compose -f podman-compose-prod.yml up --build -d
-
+chmod +x setup-parser.sh
+./setup-parser.sh
 ```
 
----
+This script will:
+- Install `podman`, `podman-compose`, `pipx`
+- Set up a `.env` file from `parser/.env.production.example`
+- Create `mail/inbox` and `logs/` directories
+- Prompt you to configure `.env`
 
-## Info
-
-Use `start-production.sh` to manage all production operations:
+Afterward, start the parser with:
 
 ```bash
-./start-production.sh setup        # Runs setup-production.sh
-./start-production.sh run          # Starts the parser container
-./start-production.sh diagnose     # Checks installed binary
-./start-production.sh reset        # Stops container and clears logs
-./start-production.sh uninstall    # Removes systemd unit
+podman-compose -f podman-compose-prod.yml up -d
 ```
 
----
-
-## Environment Configuration
-
-Copy and edit the production `.env`:
-
-```bash
-cp parser/.env.production.example parser/.env
-```
-
-Example:
+### Example `.env`
 
 ```env
 POLL_INTERVAL=5
-WEBHOOK_URL=https://your-api.local/email
+WEBHOOK_URL=https://your.api/webhook
 MAIL_DIR=/mail/inbox
 ```
 
+### Volumes
+
+Your `podman-compose-prod.yml` mounts:
+
+```yaml
+volumes:
+  - ./mail/inbox:/mail/inbox:Z
+  - ./logs:/logs:Z
+```
+
+Place `.eml` test files in `mail/inbox/` to simulate incoming email.
+
 ---
 
-## You can run the Parser in different ways
+### Important: Systemd Quadlet is Not Supported with Podman Compose
 
-### Option A: Podman Compose (production only)
+If you're using `setup-parser.sh` and `podman-compose`, **do not use Quadlet `.container` files**. They are not compatible with the 3.4.x `podman-compose` and may cause conflicts.
+
+---
+
+## 2. Full Development Setup
+
+If you're contributing to SMTPHook or testing it locally, use `setup.sh` instead.
+
+This will:
+- Install all development dependencies
+- Build `parser`, `webhook`, and `webhook-server`
+- Enable local testing via `mailpit` and mock webhooks
 
 ```bash
-podman-compose -f podman-compose-prod.yml up --build -d
+chmod +x setup.sh
+./setup.sh
 ```
 
-### Option B: Podman + systemd (Quadlet) [NOT WORKING AT THE MOMENT!]
+Start all dev services with:
 
 ```bash
-mkdir -p ~/.config/containers/systemd
-cp etc/quadlet/container-parser-prod.container ~/.config/containers/systemd/
-systemctl --user daemon-reload
-systemctl --user enable container-parser-prod.container
-systemctl --user start container-parser-prod.container
+podman-compose -f podman-compose.yml up --build
 ```
 
 ---
 
-## Webhook JSON Format
+## 3. Script Summary
 
-Emails are parsed and sent to `WEBHOOK_URL` like this:
-
-```json
-{
-  "from": "alerts@example.com",
-  "to": "team@example.com",
-  "subject": "Disk usage critical",
-  "text": "90% used on server01"
-}
-```
+| Script              | Purpose                               |
+|---------------------|---------------------------------------|
+| `setup-parser.sh`   | Minimal production setup (parser only)|
+| `setup.sh`          | Full dev setup                        |
+| `run-prod.sh`       | Run parser using podman-compose       |
+| `reset-prod.sh`     | Stop and clean parser environment     |
+| `uninstall-prod.sh` | Clean up systemd (if used manually)   |
+| `start-production.sh` | Wrapper to manage prod lifecycle    |
 
 ---
 
-## Folder Structure (Production-Focused)
+## 4. Folder Structure
 
 ```
 SMTPHook-Golang/
-├── Makefile
-├── README.md
-├── sample-email.json
-├── parser/
-│   ├── .env.example
+├── parser/                  # Main parser service
+│   ├── main.go              # Parses mail and sends JSON to webhook
 │   ├── .env.production.example
-│   ├── Dockerfile
-│   ├── go.mod
-│   └── main.go
-├── etc/
-│   └── quadlet/
-│       └── container-parser-prod.container
-├── podman-compose-prod.yml
-├── setup-production.sh
-├── run-prod.sh
-├── reset-prod.sh
-├── uninstall-prod.sh
-├── diagnose-prod.sh
-├── start-production.sh
+│   └── Dockerfile
+├── setup-parser.sh          # Parser-only setup (recommended)
+├── setup.sh                 # Dev setup
+├── podman-compose-prod.yml  # For production use
+├── podman-compose.yml       # For development stack
+├── mail/inbox/              # Drop .eml files here
+├── logs/                    # Log output from parser
 ```
 
 ---
 
-## Integration Tips
+## 5. License
 
-- The `parser` can send alerts to any HTTP endpoint that accepts JSON.
-- Examples:
-  - PagerDuty Events v2
-  - Opsgenie Alert API
-  - Prometheus Alertmanager
-  - Your own internal system
-
-You may write a simple adapter service if your API expects a different schema.
+MIT
 
 ---
 
-## License
+## 6. Contributions
 
-MIT
+Pull requests and improvements are welcome. Please use `setup.sh` for dev testing and lint your Go code before submitting.
