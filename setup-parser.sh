@@ -94,7 +94,7 @@ go mod tidy
 
 echo "Building..."
 mkdir -p ../build/parser
-go build -o ../build/parser/parser ./parser
+go build -o ../build/parser/parser .
 
 cd ..
 # === PATCH END ===
