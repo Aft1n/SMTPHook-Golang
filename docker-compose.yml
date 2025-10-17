@@ -1,0 +1,10 @@
+version: "3.9"
+
+services:
+  smtphook:
+    build: ./parser
+    env_file: .env
+    volumes:
+      - ./mail/inbox:/mail/inbox
+      - ./logs:/logs
+    restart: always
